@@ -28,9 +28,9 @@ TPP-005 + TPP-006 + TPP-011 -> TPP-012 -> TPP-013
 | TPP-008 | 独立 Checkout | native runner + checkout factory | TPP-006 | 独立 session、身份一致、独立资格重验证 | 已完成（2026-08-06；distinct/identity/qualification 门） |
 | TPP-009 | 终链白名单 | payment methods/adapters | TPP-007 | 10 类方式 URL 白名单、HTTPS 和敏感字段检查 | 已完成（2026-08-06；10 类 URL 矩阵） |
 | TPP-010 | 一次写与恢复 | runner/checkpoint | TPP-007, TPP-008 | confirm/approve 单次、未知副作用只查询、重启可恢复 | 已完成（2026-08-06；脱敏持久检查点） |
-| TPP-011 | 出口编排 | proxy/probe/UPL/runner | TPP-004, TPP-008, TPP-010 | Auth/Checkout/Billing/Runner 映射统一，代理锁并发=1 | 已完成（2026-08-06；阶段角色/处理锁测试） |
+| TPP-011 | 出口编排 | proxy/probe/UPL/runner | TPP-004, TPP-008, TPP-010 | Auth/Checkout/Billing/Runner 映射统一，代理锁并发=1 | 已完成（2026-08-07；阶段角色/处理锁测试 + 自包含三阶段浏览器 E2E） |
 | TPP-012 | 调度与数据 | scheduler/dashboard/export | TPP-005, TPP-006, TPP-011 | hybrid 比例、预算、冷却、分母统计、脱敏导出通过 | 已完成（2026-08-06；60/25/15 + 浏览器看板） |
-| TPP-013 | 浏览器与交付 | Chrome/Firefox/live fixture | TPP-012 | fixture/live、两浏览器构建、回滚和证据包通过 | 已完成（2026-08-06；双浏览器 + fixture + preflight） |
+| TPP-013 | 浏览器与交付 | Chrome/Firefox/live fixture | TPP-012 | fixture/live、两浏览器构建、回滚和证据包通过 | 已完成（2026-08-07；双浏览器 + 自包含 fixture + live preflight） |
 
 ## 执行规则
 

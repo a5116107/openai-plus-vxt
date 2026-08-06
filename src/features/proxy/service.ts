@@ -15,6 +15,7 @@ import type {
   ProxySettings,
   ProxyStage,
 } from './types';
+import { DEFAULT_PROXY_META_URL, DEFAULT_PROXY_TRACE_URL } from './types';
 import { importRegisterToolLocalRuntime } from './import-register-tool';
 
 const BYPASS_LIST = [
@@ -180,7 +181,7 @@ export async function applyAutomationProxyStage(
     nextIndex = picked.nextIndex;
     await setFixedProxy(selectedEndpoint);
     const trace = verifyExit
-      ? await verifyCurrentExit()
+      ? await verifyCurrentExit(routing.verificationTraceUrl, routing.verificationMetaUrl)
       : {
           verified: false,
           ip: '',
@@ -358,14 +359,19 @@ export interface ProxyExitTrace {
   message: string;
 }
 
-export async function verifyCurrentExit(): Promise<ProxyExitTrace> {
+export async function verifyCurrentExit(
+  traceUrl = DEFAULT_PROXY_TRACE_URL,
+  metaUrl = DEFAULT_PROXY_META_URL,
+): Promise<ProxyExitTrace> {
   const startedAt = Date.now();
   const controller = new AbortController();
   const timer = globalThis.setTimeout(() => controller.abort(), 8_000);
   try {
     const [response, metaResponse] = await Promise.all([
-      fetch('https://www.cloudflare.com/cdn-cgi/trace', { cache: 'no-store', signal: controller.signal }),
-      fetch('https://speed.cloudflare.com/meta', { cache: 'no-store', signal: controller.signal }).catch(() => null),
+      fetch(traceUrl, { cache: 'no-store', signal: controller.signal }),
+      metaUrl
+        ? fetch(metaUrl, { cache: 'no-store', signal: controller.signal }).catch(() => null)
+        : Promise.resolve(null),
     ]);
     const body = await response.text();
     const values = Object.fromEntries(body.split(/\r?\n/).map((line) => line.split('=', 2)).filter((row) => row.length === 2));
@@ -385,7 +391,7 @@ export async function verifyCurrentExit(): Promise<ProxyExitTrace> {
       asOrganization: String(meta.asOrganization || ''),
       latencyMs: Date.now() - startedAt,
       checkedAt: Date.now(),
-      message: response.ok && ip ? 'Cloudflare trace 已验证' : `Cloudflare trace HTTP ${response.status}`,
+      message: response.ok && ip ? '出口 trace 已验证' : `出口 trace HTTP ${response.status}`,
     };
   } catch (error) {
     return {

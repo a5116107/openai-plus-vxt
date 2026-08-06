@@ -53,6 +53,8 @@ git diff --check -- docs/ssot/trial-payment-probe docs/ssot/smart-automation/REA
 3. 浏览器全局代理锁使有效并发为 1；第二个任务排队或明确 `skipped`。
 4. 任一阶段身份/资格漂移后停止本单元，并产生 drift 事件。
 
+默认执行 `npm run test:e2e-proxy-stages` 时，脚本自启动 Auth/Checkout/Billing 三组本地 HTTP 代理，并以 RFC 5737 地址返回 trace/meta；三组代理必须各收到请求，且 IP、国家、ASN、阶段顺序、阶段内黏性、跨阶段去重和第二周期稳定性全部通过。显式真实代理模式必须同时提供 `OPX_E2E_AUTH_PORT`、`OPX_E2E_CHECKOUT_PORT`、`OPX_E2E_BILLING_PORT`，不接受部分覆盖。
+
 ## 6. 调度、统计与安全
 
 - `discovery`、`attribution`、`hybrid` 三模式均能生成可重放 seed。
@@ -72,6 +74,7 @@ npm run compile
 npm run build
 npm run build:firefox
 node scripts/e2e-eligibility-dashboard.mjs
+npm run test:e2e-proxy-stages
 npm run test:e2e-plus-closure
 npm run test:e2e-saved-payment:check
 ```
@@ -102,10 +105,11 @@ npm run test:e2e-saved-payment:check
 | 检查 | 结果 |
 |---|---|
 | `npm run compile` | 通过 |
-| `npx tsx --test tests/*.test.ts` | 隔离范围 `63/63` 通过 |
+| `npx tsx --test tests/*.test.ts` | 隔离范围 `65/65` 通过 |
 | `npm run build` | Chrome MV3 成功，约 1.29 MB |
 | `npm run build:firefox` | Firefox MV2 成功，约 1.29 MB |
 | `node scripts/e2e-eligibility-dashboard.mjs` | 全部检查为真，无页面/控制台错误，移动端无横向溢出 |
+| `npm run test:e2e-proxy-stages` | 嵌入式三代理各收到 4 次请求；12 项阶段、元数据、黏性、去重和周期断言全部为真 |
 | `git diff --check` | 通过 |
 | 高风险密钥模式扫描 | 无命中；继承的 ACICA 默认 API key/网页登录口令已清空 |
 

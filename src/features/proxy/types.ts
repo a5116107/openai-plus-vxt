@@ -65,6 +65,10 @@ export interface AutomationProxyRouting {
   enabled: boolean;
   stickyWithinStage: boolean;
   verifyExitOnSwitch: boolean;
+  /** Trace endpoint used to verify the active browser exit. */
+  verificationTraceUrl: string;
+  /** Optional metadata endpoint used to enrich IP/country/ASN evidence. */
+  verificationMetaUrl: string;
   requireDistinctExits: boolean;
   maxSwitchAttempts: number;
   activeBusinessStage: AutomationProxyStage | '';
@@ -202,10 +206,15 @@ export const DEFAULT_EXIT2_PROXY: ProxyEndpoint = {
   label: '出口2（可任意国家）',
 };
 
+export const DEFAULT_PROXY_TRACE_URL = 'https://www.cloudflare.com/cdn-cgi/trace';
+export const DEFAULT_PROXY_META_URL = 'https://speed.cloudflare.com/meta';
+
 export const DEFAULT_AUTOMATION_PROXY_ROUTING: AutomationProxyRouting = {
   enabled: true,
   stickyWithinStage: true,
   verifyExitOnSwitch: true,
+  verificationTraceUrl: DEFAULT_PROXY_TRACE_URL,
+  verificationMetaUrl: DEFAULT_PROXY_META_URL,
   requireDistinctExits: false,
   maxSwitchAttempts: 3,
   activeBusinessStage: '',

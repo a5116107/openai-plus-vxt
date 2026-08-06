@@ -191,6 +191,8 @@ screen -> revalidate -> createPM -> confirm -> approve -> poll -> finalize
 
 出口快照至少包含 `proxyId`、`actualIp`、`actualCountry`、`asn`、`colo`、`checkedAt`。阶段切换顺序固定为 Auth -> Checkout -> Billing/provider -> Runner；不得在单次 confirm 期间切换出口。
 
+出口校验默认读取 Cloudflare trace/meta；`automationRouting.verificationTraceUrl` 与 `verificationMetaUrl` 可替换为 HTTP(S) 校验服务，URL 不允许内嵌凭据，meta 可显式关闭。浏览器回归默认自启动三组本地 HTTP 代理并注入 RFC 5737 文档网段证据；设置完整的 `OPX_E2E_AUTH_PORT`、`OPX_E2E_CHECKOUT_PORT`、`OPX_E2E_BILLING_PORT` 后切换为真实代理模式。fixture 证据只证明扩展切换、校验、黏性、去重和账本展示链，不冒充公网出口资格结论。
+
 ## 10. 调度、覆盖率与停止条件
 
 ### 10.1 三种实验模式
