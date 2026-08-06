@@ -23,11 +23,17 @@ import type {
   AutomationStepStatus,
 } from '../features/automation/types';
 import { createDefaultStepRecords } from '../features/automation/steps';
+import {
+  DEFAULT_PLUS_CHECKOUT_CLOSURE_SETTINGS,
+  normalizePlusCheckoutClosureRun,
+  normalizePlusCheckoutClosureSettings,
+} from '../features/automation/plus-checkout-closure';
 import type { LinkExtractorState } from '../features/link-extractor/types';
 import type { OAuthState } from '../features/oauth/types';
 import type { AccountInputMode, RegisterState } from '../features/register/types';
 import type { SmsCodeRecord, SmsRelayState } from '../features/sms/types';
 import { scopedStorageKey } from './storage-scope';
+import { DEFAULT_ACICA_MAILBOX_SETTINGS, normalizeAcicaMailboxSettings } from '../features/mailbox/acica';
 
 export const DEFAULT_API_BASE = 'http://127.0.0.1:8787';
 
@@ -75,7 +81,7 @@ const DEFAULT_AUTOMATION_SETTINGS: AutomationSettings = {
   registrationMode: 'email',
   rawEmails: '',
   rawSms: '',
-  emailSelectionMode: 'next',
+  emailSelectionMode: 'random',
   specifiedEmailId: '',
   smsSourceMode: 'api',
   smsSelectionMode: 'random',
@@ -86,6 +92,8 @@ const DEFAULT_AUTOMATION_SETTINGS: AutomationSettings = {
   oauthExtractMode: 'email',
   checkoutOptions: {},
   checkoutExtractMode: DEFAULT_CHECKOUT_EXTRACT_MODE,
+  acicaMailbox: DEFAULT_ACICA_MAILBOX_SETTINGS,
+  plusCheckoutClosure: DEFAULT_PLUS_CHECKOUT_CLOSURE_SETTINGS,
 };
 
 const DEFAULT_AUTOMATION_RUN: AutomationRunState = {
@@ -283,6 +291,7 @@ export function isFeatureTab(value: string): value is FeatureTab {
     value === 'register' ||
     value === 'automation' ||
     value === 'link' ||
+    value === 'payment' ||
     value === 'oauth' ||
     value === 'address' ||
     value === 'sms' ||
@@ -351,6 +360,8 @@ function normalizeAutomationSettings(value: unknown): AutomationSettings {
     oauthExtractMode: normalizeAutomationOAuthExtractMode(source.oauthExtractMode),
     checkoutOptions: isRecord(source.checkoutOptions) ? source.checkoutOptions : DEFAULT_AUTOMATION_SETTINGS.checkoutOptions,
     checkoutExtractMode: normalizeCheckoutExtractMode(source.checkoutExtractMode || DEFAULT_AUTOMATION_SETTINGS.checkoutExtractMode),
+    acicaMailbox: normalizeAcicaMailboxSettings(source.acicaMailbox || DEFAULT_AUTOMATION_SETTINGS.acicaMailbox),
+    plusCheckoutClosure: normalizePlusCheckoutClosureSettings(source.plusCheckoutClosure),
   };
 }
 
@@ -385,6 +396,9 @@ function normalizeAutomationRun(value: unknown): AutomationRunState {
     targetWindowId: Number(source.targetWindowId || DEFAULT_AUTOMATION_RUN.targetWindowId),
     startedAt: Number(source.startedAt || DEFAULT_AUTOMATION_RUN.startedAt),
     finishedAt: Number(source.finishedAt || DEFAULT_AUTOMATION_RUN.finishedAt),
+    ...(normalizePlusCheckoutClosureRun(source.plusCheckoutClosure)
+      ? { plusCheckoutClosure: normalizePlusCheckoutClosureRun(source.plusCheckoutClosure) }
+      : {}),
   };
 }
 
@@ -514,7 +528,10 @@ function normalizeAutomationGeneratedFileRecord(value: unknown): AutomationGener
 }
 
 function normalizeAutomationEmailSelectionMode(value: unknown): AutomationEmailSelectionMode {
-  return value === 'specified' ? 'specified' : 'next';
+  if (value === 'specified' || value === 'next') {
+    return value;
+  }
+  return 'random';
 }
 
 function normalizeAutomationSmsSelectionMode(value: unknown): AutomationSmsSelectionMode {

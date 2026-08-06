@@ -25,6 +25,7 @@ export async function fetchChatGptSession(): Promise<ChatGptSessionResponse> {
   }
 
   const session = extractSessionInfo(data);
+  session.identitySnapshot = await captureIdentitySnapshot();
   if (!session.accessToken) {
     return {
       ok: false,
@@ -38,6 +39,45 @@ export async function fetchChatGptSession(): Promise<ChatGptSessionResponse> {
     message: '已读取 ChatGPT session',
     session,
   };
+}
+
+async function captureIdentitySnapshot(): Promise<NonNullable<ChatGptSessionInfo['identitySnapshot']>> {
+  const cookies = await listIdentityCookies();
+  const deviceCookie = cookies.find((cookie) => /^(oai-did|oai-device-id)$/i.test(cookie.name));
+  return {
+    deviceId: deviceCookie?.value || createIdentityId(),
+    sessionId: createIdentityId(),
+    cookies,
+    capturedAt: Date.now(),
+  };
+}
+
+async function listIdentityCookies(): Promise<NonNullable<ChatGptSessionInfo['identitySnapshot']>['cookies']> {
+  const output = new Map<string, NonNullable<ChatGptSessionInfo['identitySnapshot']>['cookies'][number]>();
+  for (const domain of ['chatgpt.com', 'openai.com']) {
+    let batch: Browser.cookies.Cookie[] = [];
+    try { batch = await browser.cookies.getAll({ domain }); } catch { batch = []; }
+    for (const cookie of batch) {
+      const key = `${cookie.storeId}|${cookie.domain}|${cookie.path}|${cookie.name}`;
+      output.set(key, {
+        name: cookie.name,
+        value: cookie.value,
+        domain: cookie.domain,
+        path: cookie.path || '/',
+        secure: cookie.secure,
+        httpOnly: cookie.httpOnly,
+        sameSite: String(cookie.sameSite || '') || undefined,
+        expirationDate: cookie.expirationDate,
+        storeId: cookie.storeId,
+        firstPartyDomain: String((cookie as Browser.cookies.Cookie & { firstPartyDomain?: string }).firstPartyDomain || ''),
+      });
+    }
+  }
+  return [...output.values()];
+}
+
+function createIdentityId(): string {
+  try { return crypto.randomUUID(); } catch { return `${Date.now()}-${Math.random().toString(36).slice(2, 14)}`; }
 }
 
 function extractSessionInfo(data: Record<string, unknown>): ChatGptSessionInfo {
