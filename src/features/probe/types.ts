@@ -70,6 +70,7 @@ export type ProbePaymentMethodLinkStatus =
   | 'checkout_create_failed'
   | 'session_not_distinct'
   | 'runner_failed'
+  | 'forced_probe'
   | 'link_ready';
 
 export interface ProbePaymentMethodLink {

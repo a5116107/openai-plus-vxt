@@ -106,7 +106,9 @@ export function qualificationLinkAggregateStatus(input: {
   qualificationPreserved?: boolean;
   qualificationVerified?: boolean;
   finalLinkVerified?: boolean;
+  forcedProbe?: boolean;
 }): ProbePaymentLinkAggregateStatus {
+  if (input.forcedProbe) return 'probe_required';
   const sessionProven = input.sessionMode === 'independent_checkout'
     ? Boolean(input.sessionDistinct)
     : Boolean(input.sourceSessionReused);

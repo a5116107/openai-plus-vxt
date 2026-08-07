@@ -345,6 +345,72 @@ test('持久检查点恢复只查询原 Checkout，不重复任何支付写操�
   assert.deepEqual(calls, { screen: 0, revalidate: 1, createPM: 0, confirm: 0, approve: 0, poll: 1, finalize: 1 });
 });
 
+test('link_ready 恢复只重验资格与终链，不重放支付步骤', async () => {
+  const recovery: PaymentRunnerCheckpoint = {
+    version: 1,
+    operationKey: 'payment-operation/run/account/default/cs_test_runner/upi/1',
+    checkoutSessionId: context.checkoutSessionId,
+    method: context.method,
+    stage: 'finalize',
+    status: 'link_ready',
+    code: 'LINK_READY',
+    updatedAt: 123,
+    confirmSubmitted: true,
+    approveSubmitted: false,
+    sideEffect: 'confirmed',
+    paymentMethodId: 'pm_test_runner',
+    finalUrl: 'https://payments.stripe.com/upi/instructions/restored',
+  };
+  const calls = { screen: 0, revalidate: 0, createPM: 0, confirm: 0, approve: 0, poll: 0, finalize: 0 };
+  const checkpoints: string[] = [];
+  const result = await runNativePaymentRunner(context, makeTransport({
+    screen: async () => { calls.screen += 1; return ok(validGatePayload, 'SCREEN_OK'); },
+    revalidate: async (_context, checkpoint) => {
+      calls.revalidate += 1;
+      assert.equal(checkpoint, 'restore_link_ready');
+      return ok(validGatePayload, 'REVALIDATE_OK');
+    },
+    createPaymentMethod: async () => { calls.createPM += 1; return ok({ id: 'pm_duplicate' }, 'PM_OK'); },
+    confirm: async () => { calls.confirm += 1; return ok({ payload: {}, requiresApproval: false }, 'CONFIRM_OK'); },
+    approve: async () => { calls.approve += 1; return ok({ payload: {}, approved: true }, 'APPROVE_OK'); },
+    poll: async () => { calls.poll += 1; return ok({ payload: {} }, 'POLL_OK'); },
+    finalize: async () => { calls.finalize += 1; return ok({ url: recovery.finalUrl! }, 'FINAL_OK'); },
+  }), {
+    recovery,
+    onCheckpoint: (checkpoint) => { checkpoints.push(checkpoint.status); },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 'link_ready');
+  assert.equal(result.finalUrl, recovery.finalUrl);
+  assert.equal(result.gate?.passed, true);
+  assert.deepEqual(calls, { screen: 0, revalidate: 1, createPM: 0, confirm: 0, approve: 0, poll: 0, finalize: 0 });
+  assert.deepEqual(checkpoints, []);
+});
+
+test('link_ready 恢复重验发现资格丢失时不返回旧终链', async () => {
+  const recovery: PaymentRunnerCheckpoint = {
+    version: 1,
+    operationKey: 'payment-operation/run/account/default/cs_test_runner/upi/1',
+    checkoutSessionId: context.checkoutSessionId,
+    method: context.method,
+    stage: 'finalize',
+    status: 'link_ready',
+    code: 'LINK_READY',
+    updatedAt: 123,
+    confirmSubmitted: true,
+    approveSubmitted: false,
+    sideEffect: 'confirmed',
+    finalUrl: 'https://payments.stripe.com/upi/instructions/stale',
+  };
+  const result = await runNativePaymentRunner(context, makeTransport({
+    revalidate: async () => ok({ ...validGatePayload, amount_total: 1 }, 'REVALIDATE_OK'),
+  }), { recovery });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 'not_qualified');
+  assert.equal(result.code, 'STRICT_GATE_NOT_QUALIFIED');
+  assert.equal(result.finalUrl, undefined);
+});
+
 test('finalize 前资格漂移时不返回链接', async () => {
   let revalidations = 0;
   let finalizes = 0;

@@ -19,15 +19,15 @@ TPP-005 + TPP-006 + TPP-011 -> TPP-012 -> TPP-013
 | ID | 批次 | 责任边界 | 依赖 | 交付与验收信号 | 状态 |
 |---|---|---|---|---|---|
 | TPP-001 | 契约 | `docs/ssot/trial-payment-probe` | - | README/TASKS/VERIFY 三件套存在，字段和不变量冻结 | 已完成（2026-08-06） |
-| TPP-002 | 回归锁 | `src/features/link-extractor`, `src/features/probe` 测试 | TPP-001 | 现有零金额、trial、promo 测试基线可重复 | 已完成（2026-08-07；隔离交付范围 66 项） |
+| TPP-002 | 回归锁 | `src/features/link-extractor`, `src/features/probe` 测试 | TPP-001 | 现有零金额、trial、promo 测试基线可重复 | 已完成（2026-08-07；隔离交付范围 68 项） |
 | TPP-003 | 资格账本 | qualification types/evidence | TPP-002 | 8 类资格和 6 级证据可分类、晋级、降级 | 已完成（2026-08-06；资格账本测试） |
 | TPP-004 | 严格解析 | checkout amount/HTML/API fixtures | TPP-003 | 结构化零金额、trial、promo、非零、未知均有 fixture | 已完成（2026-08-06；Checkout 8 项） |
 | TPP-005 | 漂移 | factor tracking/drift store | TPP-003 | 金额、币种、身份、方式漂移生成事件并停止单元 | 已完成（2026-08-06；五类漂移测试） |
-| TPP-006 | 方式发现 | payment detection/candidate selection | TPP-003 | detected/requested/forced 三层候选可审计，未暴露隔离 | 已完成（2026-08-06；readiness/candidate 测试） |
+| TPP-006 | 方式发现 | payment detection/candidate selection | TPP-003 | detected/requested/forced 三层候选可审计，未暴露隔离 | 已完成（2026-08-07；`forced_probe` 恒为 `probe_required`，不晋级主 Runner/最佳链接） |
 | TPP-007 | 复用 Checkout | native runner + probe service | TPP-006 | 复用源 session，资格保持失败不写支付 | 已完成（2026-08-06；Runner/证据门） |
 | TPP-008 | 独立 Checkout | native runner + checkout factory | TPP-006 | 独立 session、身份一致、独立资格重验证 | 已完成（2026-08-07；distinct=true、reused=false、独立资格门） |
 | TPP-009 | 终链白名单 | payment methods/adapters | TPP-007 | 10 类方式 URL 白名单、HTTPS 和敏感字段检查 | 已完成（2026-08-06；10 类 URL 矩阵） |
-| TPP-010 | 一次写与恢复 | runner/checkpoint | TPP-007, TPP-008 | confirm/approve 单次、未知副作用只查询、重启可恢复 | 已完成（2026-08-06；脱敏持久检查点） |
+| TPP-010 | 一次写与恢复 | runner/checkpoint | TPP-007, TPP-008 | confirm/approve 单次、未知副作用只查询、重启可恢复 | 已完成（2026-08-07；`link_ready` 恢复仅重验资格与 URL，不重放支付步骤） |
 | TPP-011 | 出口编排 | proxy/probe/UPL/runner | TPP-004, TPP-008, TPP-010 | Auth/Checkout/Billing/Runner 映射统一，代理锁并发=1 | 已完成（2026-08-07；阶段角色/处理锁测试 + 自包含三阶段浏览器 E2E） |
 | TPP-012 | 调度与数据 | scheduler/dashboard/export | TPP-005, TPP-006, TPP-011 | hybrid 比例、预算、冷却、分母统计、脱敏导出通过 | 已完成（2026-08-06；60/25/15 + 浏览器看板） |
 | TPP-013 | 浏览器与交付 | Chrome/Firefox/live fixture | TPP-012 | fixture/live、两浏览器构建、回滚和证据包通过 | 已完成（2026-08-07；双浏览器 + 自包含 fixture + live preflight） |

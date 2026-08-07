@@ -55,8 +55,8 @@ export function recoveryActionForPaymentCheckpoint(checkpoint: {
   confirmSubmitted: boolean;
   approveSubmitted: boolean;
   sideEffect: 'none' | 'confirmed' | 'unknown';
-}): 'completed' | 'query_original_checkout' | 'restart_read_only' {
-  if (checkpoint.status === 'link_ready') return 'completed';
+}): 'revalidate_completed' | 'query_original_checkout' | 'restart_read_only' {
+  if (checkpoint.status === 'link_ready') return 'revalidate_completed';
   if (checkpoint.sideEffect === 'unknown' || checkpoint.confirmSubmitted || checkpoint.approveSubmitted) {
     return 'query_original_checkout';
   }

@@ -100,13 +100,13 @@ export async function runNativePaymentRunner(
     await hooks.onEvent?.(event);
   };
 
-  const begin = async (stage: PaymentRunnerStage) => {
+  const begin = async (stage: PaymentRunnerStage, persistCheckpoint = true) => {
     state.stage = stage;
     if (hooks.signal?.aborted) throw new DOMException('Payment runner aborted', 'AbortError');
     const role = adapter.proxyRole(stage);
     await hooks.beforeStage?.(stage, role);
     await emit(stage, 'started', 'STAGE_STARTED', `${stage} started`);
-    await saveCheckpoint();
+    if (persistCheckpoint) await saveCheckpoint();
   };
 
   const finishFailure = async <T>(stage: PaymentRunnerStage, result: PaymentStepResult<T>): Promise<PaymentRunnerResult> => {
@@ -120,8 +120,13 @@ export async function runNativePaymentRunner(
     stage: 'screen' | 'revalidate',
     result: PaymentStepResult<unknown>,
     revision: number,
+    persistFailure = true,
   ): Promise<PaymentRunnerResult | null> => {
-    if (!result.ok) return finishFailure(stage, result);
+    if (!result.ok) {
+      if (persistFailure) return finishFailure(stage, result);
+      await emit(stage, 'failed', result.code, result.message);
+      return buildFailure(context, state, result);
+    }
     const gate = evaluateStrictZeroGate(result.data, context.method, expectedCurrency, now());
     if (!gate.passed) {
       await emit(stage, 'failed', 'STRICT_GATE_CLOSED', gate.reasons.join(','), gate.reasons);
@@ -144,9 +149,18 @@ export async function runNativePaymentRunner(
     return null;
   };
 
-  const revalidate = async (checkpoint: string, revision: number): Promise<PaymentRunnerResult | null> => {
-    await begin('revalidate');
-    return qualify('revalidate', await transport.revalidate(context, checkpoint), revision);
+  const revalidate = async (
+    checkpoint: string,
+    revision: number,
+    persistCheckpoint = true,
+  ): Promise<PaymentRunnerResult | null> => {
+    await begin('revalidate', persistCheckpoint);
+    return qualify(
+      'revalidate',
+      await transport.revalidate(context, checkpoint),
+      revision,
+      persistCheckpoint,
+    );
   };
 
   const pollAndFinalize = async (revision: number): Promise<PaymentRunnerResult> => {
@@ -203,15 +217,17 @@ export async function runNativePaymentRunner(
     }
 
     if (recovery?.status === 'link_ready' && recovery.finalUrl && adapter.acceptsFinalUrl(recovery.finalUrl)) {
+      const failure = await revalidate('restore_link_ready', 1, false);
+      if (failure) return failure;
       return {
         ok: true,
         status: 'link_ready',
         method: context.method,
         stage: 'finalize',
         code: recovery.code || 'LINK_READY',
-        message: 'restored completed payment operation',
+        message: 'restored payment operation after qualification revalidation',
         events: state.events,
-        gate: recovery.gate,
+        gate: state.gate?.gate,
         paymentMethodId: recovery.paymentMethodId,
         finalUrl: recovery.finalUrl,
         confirmSubmitted: recovery.confirmSubmitted,

@@ -3102,7 +3102,7 @@ async function maybeEnrichFinalUrl(
         gate: runner.gate,
       });
       const linkStatus = runner.ok && runner.finalUrl && evidence.qualificationPreserved
-        ? 'link_ready'
+        ? forcedProbe ? 'forced_probe' : 'link_ready'
         : runner.ok && runner.finalUrl
           ? 'qualification_lost'
           : paymentCheckoutFailureStatus(runner);
@@ -3121,16 +3121,16 @@ async function maybeEnrichFinalUrl(
         forcedProbe,
         ...evidence,
         qualificationVerified: Boolean(runner.gate?.passed),
-        finalLinkVerified: linkStatus === 'link_ready' && Boolean(runner.finalUrl),
+        finalLinkVerified: (linkStatus === 'link_ready' || linkStatus === 'forced_probe') && Boolean(runner.finalUrl),
         runnerStatus: runner.status,
         runnerCode: runner.code,
         createdAt: Date.now(),
       });
-      if (!primaryRunner || (!primaryRunner.ok && runner.ok && runner.finalUrl)) {
+      if (!forcedProbe && (!primaryRunner || (!primaryRunner.ok && runner.ok && runner.finalUrl))) {
         primaryRunner = runner;
         primaryMethod = method;
       }
-      if (runner.ok && runner.finalUrl && extracted.best?.source !== 'stripe_confirm') {
+      if (!forcedProbe && runner.ok && runner.finalUrl && extracted.best?.source !== 'stripe_confirm') {
         extracted = {
           ok: true,
           message: runner.message,
@@ -3159,7 +3159,8 @@ async function maybeEnrichFinalUrl(
       aggregateStatus: qualificationLinkAggregateStatus(item),
     }));
     const nativeMethodLinks = aggregatedMethodLinks.filter((item) => item.method !== 'hosted');
-    const successfulLinks = nativeMethodLinks.filter((item) => item.finalLinkVerified && item.url);
+    const successfulLinks = nativeMethodLinks.filter((item) =>
+      item.aggregateStatus === 'qualified_payment_link' && item.finalLinkVerified && item.url);
     next = {
       ...next,
       paymentMethodLinks: aggregatedMethodLinks,

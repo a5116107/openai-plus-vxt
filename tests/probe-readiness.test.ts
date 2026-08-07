@@ -291,15 +291,17 @@ test('命中库 CSV 保留方式资格保持证据', () => {
     identitySnapshotReady: true, resolvedCheckoutSessionType: 'stripe',
     hostedResolutionMethods: ['upi'], stripeResourceCount: 3, stripePublishableKeyFound: true,
     paymentMethodLinks: [{
-      method: 'upi', url: 'https://payments.stripe.com/upi/instructions/preserved', status: 'link_ready',
+      method: 'upi', url: 'https://payments.stripe.com/upi/instructions/preserved', status: 'forced_probe',
       message: 'fixture', checkoutCountry: 'IN', currency: 'inr', sessionMode: 'reuse_eligibility_session',
       sessionDistinct: false, sourceQualificationVerified: true, forcedProbe: true, sourceSessionReused: true,
       methodOffered: true, qualificationPreserved: true, qualificationVerified: true,
-      finalLinkVerified: true, runnerStatus: 'link_ready', runnerCode: 'LINK_READY', createdAt: Date.now(),
+      finalLinkVerified: true, aggregateStatus: 'probe_required',
+      runnerStatus: 'link_ready', runnerCode: 'LINK_READY', createdAt: Date.now(),
     }],
   };
   const csv = exportHitDatabaseCsv([record]);
   assert.match(csv, /forced=true\|sourceQualified=true\|reused=true\|offered=true\|preserved=true/);
+  assert.match(csv, /forced_probe/);
   assert.match(csv, /hostedResolutionStatus,hostedResolutionMessage,identitySnapshotReady,resolvedCheckoutSessionType,hostedResolutionMethods,stripeResourceCount,stripePublishableKeyFound/);
   assert.match(csv, /resolved_hosted,fixture resolved,true,stripe,upi,3,true/);
   assert.doesNotMatch(csv, /pk_(?:live|test)_/);

@@ -29,7 +29,7 @@ git diff --check -- docs/ssot/trial-payment-probe src/features/probe src/feature
 
 - detected + offered + reused session -> `provider-final` 或明确 runner 失败；
 - detected but qualification revalidate fails -> `qualification_lost`，无 confirm；
-- unlisted + `forceUnlistedPaymentMethodProbe` -> `forcedProbe=true`，不得进入生产候选；
+- unlisted + `forceUnlistedPaymentMethodProbe` -> `forcedProbe=true`；即使严格门和 URL 均通过，也必须是 `status=forced_probe` + `aggregateStatus=probe_required`，不得进入生产候选、主 Runner 或最佳链接；
 - final URL 不匹配白名单、含凭据、端口或 hash -> `finalLinkVerified=false`；
 - Hosted 只验证长链和源资格，不伪造 native Runner 结果。
 
@@ -42,7 +42,8 @@ git diff --check -- docs/ssot/trial-payment-probe src/features/probe src/feature
 | 独立会话证据 | `sessionDistinct=true`、`sourceSessionReused=false`，独立会话资格重验证通过 |
 | confirm 超时/断连 | 生成 `unknown_side_effect`，只查询原 session |
 | approve 失败 | 不重试第二次 approve，保留 provider 响应 |
-| 重启 | checkpoint 恢复只读阶段，不重复成功写操作 |
+| 重启中间态 | checkpoint 恢复只读阶段，不重复成功写操作 |
+| 重启已完成终链 | `link_ready` 仅调用一次 `restore_link_ready` 资格重验；createPM/confirm/approve/poll/finalize 调用数均为 0，资格丢失时不返回旧 URL |
 | 账号切换 | 浏览器上下文、Cookie、代理锁隔离 |
 
 ## 5. 多阶段出口
@@ -103,7 +104,7 @@ npm run test:e2e-proxy-stages
 | 检查 | 结果 |
 |---|---|
 | `npm run compile` | 通过 |
-| `npx tsx --test tests/*.test.ts` | 隔离范围 `66/66` 通过 |
+| `npx tsx --test tests/*.test.ts` | 隔离范围 `68/68` 通过；新增强制筛查生产隔离与 `link_ready` 恢复重验回归 |
 | `npm run build` | Chrome MV3 成功，约 1.29 MB |
 | `npm run build:firefox` | Firefox MV2 成功，约 1.29 MB |
 | `node scripts/e2e-eligibility-dashboard.mjs` | 全部检查为真，无页面/控制台错误，移动端无横向溢出 |
@@ -111,7 +112,7 @@ npm run test:e2e-proxy-stages
 | `git diff --check` | 通过 |
 | 高风险密钥模式扫描 | 无命中；继承的 ACICA 默认 API key/网页登录口令已清空 |
 
-隔离范围的 66 项只统计 TPP、支付 Runner、Checkout、资格与直接依赖测试；原共享工作树的 120 项全量证据仅作为历史跨 SSOT 回归记录，两者分母不混用。当前可复跑门禁以本节 66 项为准。
+隔离范围的 68 项只统计 TPP、支付 Runner、Checkout、资格与直接依赖测试；原共享工作树的 120 项全量证据仅作为历史跨 SSOT 回归记录，两者分母不混用。当前可复跑门禁以本节 68 项为准。
 
 ## 10. 交付门禁
 
