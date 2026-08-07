@@ -81,7 +81,7 @@ test('支付终链聚合状态严格要求源资格、方式呈现、资格保�
     ...base, sessionMode: 'independent_checkout', sessionDistinct: false,
   }), 'probe_required');
   assert.equal(qualificationLinkAggregateStatus({
-    ...base, sessionMode: 'independent_checkout', sessionDistinct: true,
+    ...base, sessionMode: 'independent_checkout', sessionDistinct: true, sourceSessionReused: false,
   }), 'qualified_payment_link');
 });
 

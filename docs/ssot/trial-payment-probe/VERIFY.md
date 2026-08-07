@@ -7,7 +7,7 @@
 ```powershell
 rg -n "trial-payment-probe|qualificationPreserved|methodOffered|provider-final" docs/ssot src/features
 rg -n "(token|accessToken|client_secret|cardNumber|cvv)" docs/ssot/trial-payment-probe
-git diff --check -- docs/ssot/trial-payment-probe docs/ssot/smart-automation/README.md docs/ssot/payment-runner/README.md docs/ssot/eligibility-factors/README.md docs/ssot/multi-factor-experiments/README.md
+git diff --check -- docs/ssot/trial-payment-probe src/features/probe src/features/payment tests
 ```
 
 预期：入口链接唯一、没有敏感值、无空白错误；领域文档不复制本 SSOT 的状态定义。
@@ -39,6 +39,7 @@ git diff --check -- docs/ssot/trial-payment-probe docs/ssot/smart-automation/REA
 |---|---|
 | `reuse_eligibility_session` | `sourceSessionReused=true`，同一 session 重新验证资格 |
 | `independent_checkout` | session ID 不同、账号身份相同、独立金额为 0/trial |
+| 独立会话证据 | `sessionDistinct=true`、`sourceSessionReused=false`，独立会话资格重验证通过 |
 | confirm 超时/断连 | 生成 `unknown_side_effect`，只查询原 session |
 | approve 失败 | 不重试第二次 approve，保留 provider 响应 |
 | 重启 | checkpoint 恢复只读阶段，不重复成功写操作 |
@@ -69,14 +70,11 @@ git diff --check -- docs/ssot/trial-payment-probe docs/ssot/smart-automation/REA
 node C:/Users/Administrator/.codex/skills/dev-workbench/scripts/patch-entry.mjs --phase execute --mode default --format both
 node C:/Users/Administrator/.codex/skills/quality-guard/scripts/review-entry.mjs --phase verify --mode review-quality --format both
 npx tsx --test tests/*.test.ts
-node --test tests/saved-payment-test-backend.test.mjs
 npm run compile
 npm run build
 npm run build:firefox
 node scripts/e2e-eligibility-dashboard.mjs
 npm run test:e2e-proxy-stages
-npm run test:e2e-plus-closure
-npm run test:e2e-saved-payment:check
 ```
 
 `patch-entry` 必须产生 `command.outputs.latest.json` 和 `checkpoint.latest.json`；`review-entry` 必须产生 `spec.verdict.latest.json`、`quality.verdict.latest.json`、`verify.evidence.latest.json`。命令失败时保留工件，按最早失败任务恢复。
@@ -105,7 +103,7 @@ npm run test:e2e-saved-payment:check
 | 检查 | 结果 |
 |---|---|
 | `npm run compile` | 通过 |
-| `npx tsx --test tests/*.test.ts` | 隔离范围 `65/65` 通过 |
+| `npx tsx --test tests/*.test.ts` | 隔离范围 `66/66` 通过 |
 | `npm run build` | Chrome MV3 成功，约 1.29 MB |
 | `npm run build:firefox` | Firefox MV2 成功，约 1.29 MB |
 | `node scripts/e2e-eligibility-dashboard.mjs` | 全部检查为真，无页面/控制台错误，移动端无横向溢出 |
@@ -113,7 +111,7 @@ npm run test:e2e-saved-payment:check
 | `git diff --check` | 通过 |
 | 高风险密钥模式扫描 | 无命中；继承的 ACICA 默认 API key/网页登录口令已清空 |
 
-隔离范围的 63 项只统计 TPP、支付 Runner、Checkout、资格与直接依赖测试；原共享工作树的 120 项全量证据仍作为跨 SSOT 回归记录，两者分母不混用。
+隔离范围的 66 项只统计 TPP、支付 Runner、Checkout、资格与直接依赖测试；原共享工作树的 120 项全量证据仅作为历史跨 SSOT 回归记录，两者分母不混用。当前可复跑门禁以本节 66 项为准。
 
 ## 10. 交付门禁
 

@@ -1,6 +1,6 @@
 # 试用资格与多支付提链 SSOT
 
-状态：`canonical-implemented`，文档版本 `1.1.0`，更新时间：2026-08-06
+状态：`canonical-implemented`，文档版本 `1.1.1`，更新时间：2026-08-07
 
 本文件是试用、优惠、零金额资格探测，以及多支付方式提取终链的唯一编排真相。`smart-automation`、`payment-runner`、`eligibility-factors`、`multi-factor-experiments` 和 `saved-payment-methods` 只保留领域细节；当这些文档与本文件的编排规则冲突时，以本文件为准。
 
@@ -55,7 +55,7 @@ qualificationVerified == true
 finalLinkVerified == true
 ```
 
-`sourceSessionReused` 在复用模式必须为 `true`；独立 Checkout 模式必须证明 `sessionDistinct == true`，并在独立会话重新通过资格门禁。任何字段缺失都只能是 `probe_required` 或失败状态，不能降级为成功。
+`sourceSessionReused` 在复用模式必须为 `true`。独立 Checkout 模式必须保持 `sourceSessionReused == false`，证明 `sessionDistinct == true`，并在独立会话重新通过资格门禁。任何字段缺失都只能是 `probe_required` 或失败状态，不能降级为成功。
 
 `qualified_payment_link` 与 `probe_required` 是已落地的目标聚合状态。独立 Checkout 还必须满足 `sessionDistinct=true`；Hosted 源长链固定按复用源资格会话计算，不伪装为独立 Checkout。
 

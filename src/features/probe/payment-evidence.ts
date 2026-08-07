@@ -7,6 +7,7 @@ export interface PaymentLinkEvidenceInput {
   sessionMode: ProbePaymentCheckoutSessionMode;
   sourceCheckoutSessionId: string;
   checkoutSessionId: string;
+  sessionDistinct: boolean;
   sourceQualificationVerified: boolean;
   gate?: StrictZeroGateResult;
 }
@@ -39,15 +40,19 @@ export function selectPaymentProbeCandidates(input: {
     .map((method) => ({ method, forcedProbe: !detectedSet.has(method) }));
 }
 
-/**
- * A method-specific link is only a preservation result when it stayed on the
- * already-qualified Checkout and the runner revalidated that same Checkout.
- */
+/** A method link preserves qualification on the session required by its mode. */
 export function buildPaymentLinkEvidence(input: PaymentLinkEvidenceInput): PaymentLinkEvidence {
   const sourceCheckoutSessionId = String(input.sourceCheckoutSessionId || '').trim();
   const checkoutSessionId = String(input.checkoutSessionId || '').trim();
   const sourceSessionReused = Boolean(sourceCheckoutSessionId)
     && sourceCheckoutSessionId === checkoutSessionId;
+  const sessionDistinct = Boolean(sourceCheckoutSessionId)
+    && Boolean(checkoutSessionId)
+    && sourceCheckoutSessionId !== checkoutSessionId
+    && input.sessionDistinct;
+  const sessionProven = input.sessionMode === 'independent_checkout'
+    ? sessionDistinct
+    : sourceSessionReused;
   const expectedMethod = input.method === 'kakao' ? 'kakao_pay' : input.method;
   const methodOffered = Boolean(input.gate?.methods?.includes(expectedMethod));
   const sourceQualificationVerified = Boolean(input.sourceQualificationVerified);
@@ -56,7 +61,7 @@ export function buildPaymentLinkEvidence(input: PaymentLinkEvidenceInput): Payme
     sourceQualificationVerified,
     sourceSessionReused,
     methodOffered,
-    qualificationPreserved: sourceSessionReused
+    qualificationPreserved: sessionProven
       && sourceQualificationVerified
       && Boolean(input.gate?.passed)
       && methodOffered,

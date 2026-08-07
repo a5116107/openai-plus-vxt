@@ -207,6 +207,7 @@ test('复用同一资格 Checkout 且方式已暴露才标记为资格保持', (
     sessionMode: 'reuse_eligibility_session',
     sourceCheckoutSessionId: 'cs_qualified',
     checkoutSessionId: 'cs_qualified',
+    sessionDistinct: false,
     sourceQualificationVerified: true,
     gate,
   });
@@ -216,12 +217,16 @@ test('复用同一资格 Checkout 且方式已暴露才标记为资格保持', (
     methodOffered: true,
     qualificationPreserved: true,
   });
+});
 
+test('独立 Checkout 保留真实会话关系并以独立资格重验证作为成功条件', () => {
+  const gate = evaluateStrictZeroGate(validGatePayload, 'upi', 'inr');
   const independent = buildPaymentLinkEvidence({
     method: 'upi',
     sessionMode: 'independent_checkout',
     sourceCheckoutSessionId: 'cs_qualified',
     checkoutSessionId: 'cs_control',
+    sessionDistinct: false,
     sourceQualificationVerified: true,
     gate,
   });
@@ -231,12 +236,13 @@ test('复用同一资格 Checkout 且方式已暴露才标记为资格保持', (
   const independentQualified = buildPaymentLinkEvidence({
     method: 'upi',
     sessionMode: 'independent_checkout',
-    sourceCheckoutSessionId: 'cs_control',
+    sourceCheckoutSessionId: 'cs_qualified',
     checkoutSessionId: 'cs_control',
+    sessionDistinct: true,
     sourceQualificationVerified: true,
     gate,
   });
-  assert.equal(independentQualified.sourceSessionReused, true);
+  assert.equal(independentQualified.sourceSessionReused, false);
   assert.equal(independentQualified.qualificationPreserved, true);
 });
 

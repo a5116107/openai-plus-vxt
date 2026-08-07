@@ -108,7 +108,7 @@ export function qualificationLinkAggregateStatus(input: {
   finalLinkVerified?: boolean;
 }): ProbePaymentLinkAggregateStatus {
   const sessionProven = input.sessionMode === 'independent_checkout'
-    ? Boolean(input.sessionDistinct && input.sourceSessionReused)
+    ? Boolean(input.sessionDistinct)
     : Boolean(input.sourceSessionReused);
   return input.sourceQualificationVerified
     && sessionProven

@@ -88,11 +88,11 @@ export interface ProbePaymentMethodLink {
   sourceQualificationVerified?: boolean;
   /** Method was screened because it was configured but absent from discovery. */
   forcedProbe?: boolean;
-  /** The method runner used exactly the Checkout session that supplied its qualification evidence. */
+  /** The method runner reused the original eligibility Checkout. Always false for an independent Checkout. */
   sourceSessionReused?: boolean;
   /** The target payment method was present in the revalidated method list. */
   methodOffered?: boolean;
-  /** Source qualification and target-method qualification both passed on one session. */
+  /** Qualification passed on the session required by the selected reuse/independent mode. */
   qualificationPreserved?: boolean;
   qualificationVerified: boolean;
   finalLinkVerified: boolean;

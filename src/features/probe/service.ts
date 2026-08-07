@@ -2876,6 +2876,7 @@ async function maybeEnrichFinalUrl(
           sessionMode: task.config.paymentCheckoutSessionMode,
           sourceCheckoutSessionId,
           checkoutSessionId: String(runnerResponse.checkoutSessionId || ''),
+          sessionDistinct: paymentCheckout.sessionDistinct,
           sourceQualificationVerified: Boolean(next.qualificationVerified),
         });
         methodLinks.push({
@@ -2907,6 +2908,7 @@ async function maybeEnrichFinalUrl(
           sessionMode: task.config.paymentCheckoutSessionMode,
           sourceCheckoutSessionId,
           checkoutSessionId: String(runnerResponse.checkoutSessionId || ''),
+          sessionDistinct: paymentCheckout.sessionDistinct,
           sourceQualificationVerified: Boolean(next.qualificationVerified),
         });
         methodLinks.push({
@@ -2953,6 +2955,7 @@ async function maybeEnrichFinalUrl(
           sessionMode: task.config.paymentCheckoutSessionMode,
           sourceCheckoutSessionId,
           checkoutSessionId: runnerCheckoutSessionId,
+          sessionDistinct: paymentCheckout.sessionDistinct,
           sourceQualificationVerified: Boolean(next.qualificationVerified),
         });
         methodLinks.push({
@@ -2991,6 +2994,7 @@ async function maybeEnrichFinalUrl(
           sessionMode: task.config.paymentCheckoutSessionMode,
           sourceCheckoutSessionId,
           checkoutSessionId: runnerCheckoutSessionId,
+          sessionDistinct: paymentCheckout.sessionDistinct,
           sourceQualificationVerified: Boolean(next.qualificationVerified),
         });
         methodLinks.push({
@@ -3091,8 +3095,9 @@ async function maybeEnrichFinalUrl(
       const evidence = buildPaymentLinkEvidence({
         method,
         sessionMode: task.config.paymentCheckoutSessionMode,
-        sourceCheckoutSessionId: independent ? runnerCheckoutSessionId : sourceCheckoutSessionId,
+        sourceCheckoutSessionId,
         checkoutSessionId: runnerCheckoutSessionId,
+        sessionDistinct: paymentCheckout.sessionDistinct,
         sourceQualificationVerified: independent ? Boolean(runner.gate?.passed) : Boolean(next.qualificationVerified),
         gate: runner.gate,
       });
