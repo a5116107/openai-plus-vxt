@@ -43,7 +43,7 @@ git diff --check -- docs/ssot/trial-payment-probe src/features/probe src/feature
 | confirm 超时/断连 | 生成 `unknown_side_effect`，只查询原 session |
 | approve 失败 | 不重试第二次 approve，保留 provider 响应 |
 | 重启中间态 | checkpoint 恢复只读阶段，不重复成功写操作 |
-| 重启已完成终链 | `link_ready` 仅调用一次 `restore_link_ready` 资格重验；createPM/confirm/approve/poll/finalize 调用数均为 0，资格丢失时不返回旧 URL |
+| 重启已完成终链 | `link_ready` 仅调用一次 `restore_link_ready` 资格重验；createPM/confirm/approve/poll/finalize 调用数均为 0，不改写已完成 checkpoint，资格丢失时不返回旧 URL |
 | 账号切换 | 浏览器上下文、Cookie、代理锁隔离 |
 
 ## 5. 多阶段出口
