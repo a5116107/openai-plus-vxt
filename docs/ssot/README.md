@@ -6,7 +6,7 @@
 
 - 版本：`0.0.37`。
 - 本地实现：试用资格分类、严格晋级、十类支付方式候选与终链、保存支付方式、Plus 双 Checkout、Auth/Checkout/Billing 多阶段出口、恢复不重放、IndexedDB 归档、独立运营页面、隔离上下文调度和脱敏证据均已落地。
-- 本地验证：TypeScript、131 项全量测试、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、归档运营页 12/12、资格看板 32/32、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
+- 本地验证：TypeScript、134 项全量测试、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、归档运营页 12/12、资格看板全部断言、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
 - 发布：fork 预发布 `v0.0.37-ssot.2`（`b29982b`）已包含本轮 Chrome ZIP、Firefox ZIP、sources ZIP、发布清单和回滚说明；`v0.0.37-ssot.1` 保留为上一基线。
 - 质量策略：功能、安全、工作流和证据门为 PASS；四个高风险入口已完成职责拆分和 fallback 可观测性收敛；跨 184 文件迁移的 change/shape budget 继续作为显式结构债务，不提升为严格 PASS。
 

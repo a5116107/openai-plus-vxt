@@ -3,12 +3,12 @@
 | 验证项 | 命令 | 当前结果 |
 | --- | --- | --- |
 | TypeScript | `pnpm compile` | PASS，0 error |
-| 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，125/125 |
+| 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，134/134 |
 | Saved Payment 后端 | `pnpm test:saved-payment-backend` | PASS，3/3 |
 | 因素分析 | `node tools/_eligibility_analysis_smoke.mjs` | PASS |
 | 平衡排程 | `node tools/_eligibility_experiment_smoke.mjs` | PASS |
-| Chrome 构建 | `pnpm build` | PASS，Chrome MV3 1.48 MB |
-| Firefox 构建 | `pnpm build:firefox` | PASS，Firefox MV2 1.48 MB |
+| Chrome 构建 | `pnpm build` | PASS，Chrome MV3 1.51 MB |
+| Firefox 构建 | `pnpm build:firefox` | PASS，Firefox MV2 1.51 MB |
 | AppSec 基线 | `quality-guard appsec-baseline-entry` | PASS，10/10 |
 | Skills consistency | `node scripts/guardrails/skills-consistency.js --strict` | PASS |
 | SkillCompass | `node scripts/workflow/skills-quality-gate.mjs --format ai` | PASS，D1-D6 全 5/5 |
