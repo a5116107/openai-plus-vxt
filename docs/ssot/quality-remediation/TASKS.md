@@ -11,4 +11,4 @@
 | QR-07 | 0.0.37 双端交付 | 完成 | fork 预发布已包含 Chrome ZIP、Firefox XPI、SHA-256 清单和回滚说明 |
 | QR-08 | 浏览器主流程与清理超时回归 | 部分完成 | 三阶段出口、邮箱池、随机选择、清理、会话交接已真实验证；真实优惠命中入库尚无样本 |
 | QR-09 | workflow/AppSec 收口 | 完成 | workflow stack 与 AppSec 基线纳入版本控制，CommonJS guardrail 边界修复，总质量复核 blocker=0 |
-| QR-10 | 跨迁移结构预算治理 | 后续 | 184 文件迁移 change/shape budget 保持 advisory，按模块拆分超大文件与 fallback |
+| QR-10 | 跨迁移结构预算治理 | 完成（本地范围） | OAuth 日志、probe hit/report、国家出口解析已拆为职责模块；接码超时取消/本地记账失败显式进入日志和结果；剩余 184 文件迁移预算继续 advisory |

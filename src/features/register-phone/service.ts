@@ -166,12 +166,31 @@ export async function waitRegisterPhoneSmsCode(
   }
   if (selection.source !== 'api' && selection.provider && selection.order) {
     const client = createOAuthPhoneProvider(selection.source);
-    await client.setStatus(selection.provider, selection.order, 'cancel').catch(() => undefined);
-    await updateOAuthPhoneTrackedOrder(selection.source, selection.activationId, {
-      status: 'canceled',
-      lastCancelAt: Date.now(),
-      lastCancelMessage: '等待注册短信超时，已尝试取消号码',
-    }).catch(() => undefined);
+    const cleanupFailures: string[] = [];
+    try {
+      await client.setStatus(selection.provider, selection.order, 'cancel');
+    } catch (error) {
+      cleanupFailures.push(`平台取消失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+    try {
+      await updateOAuthPhoneTrackedOrder(selection.source, selection.activationId, {
+        status: 'canceled',
+        lastCancelAt: Date.now(),
+        lastCancelMessage: cleanupFailures.length
+          ? `等待短信超时，${cleanupFailures.join('；')}`
+          : '等待注册短信超时，已取消号码',
+      });
+    } catch (error) {
+      cleanupFailures.push(`本地订单状态写入失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+    await context.log?.(
+      cleanupFailures.length
+        ? `注册手机接码超时清理未完全成功：${cleanupFailures.join('；')}`
+        : '注册手机接码超时已取消号码',
+      cleanupFailures.length ? 'warn' : 'info',
+    );
+    const cleanupMessage = cleanupFailures.length ? `（清理告警：${cleanupFailures.join('；')}）` : '（号码已取消）';
+    return { kind: 'error', message: `等待注册手机验证码超时：${last.message}${cleanupMessage}` };
   }
   return { kind: 'error', message: `等待注册手机验证码超时：${last.message}` };
 }

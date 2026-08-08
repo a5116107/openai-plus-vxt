@@ -88,6 +88,7 @@ import {
   selectCountriesForProbe,
 } from '../../src/features/probe/state';
 import { defaultProbeCountries, listProbeCountries, PROBE_CHANNELS } from '../../src/features/probe/countries';
+import { parseCountryExitText } from '../../src/features/probe/country-exit-input';
 import { formatRouteVariantsText, parseRouteVariantsText } from '../../src/features/probe/experiment';
 import type {
   ProbeAccountReportRow,
@@ -4485,51 +4486,6 @@ function collectProbeTaskConfig(): ProbeTaskConfig {
     soundEnabled: checkedOf('probe-sound-enabled'),
     preferChromeTlsNote: checkedOf('probe-tls-note'),
   });
-}
-
-function parseCountryExitText(raw: string): Array<{ country: string; endpoint: { enabled: boolean; scheme: string; host: string; port: number; username: string; password: string; label: string } }> {
-  const rows: Array<{ country: string; endpoint: { enabled: boolean; scheme: string; host: string; port: number; username: string; password: string; label: string } }> = [];
-  raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).forEach((line) => {
-    const [countryPart, endpointPart] = line.split('----').map((part) => part.trim());
-    const country = String(countryPart || '').toUpperCase();
-    if (!/^[A-Z]{2}$/.test(country) || !endpointPart) return;
-    let scheme = 'http';
-    let host = '';
-    let port = 0;
-    let username = '';
-    let password = '';
-    try {
-      const normalized = endpointPart.includes('://') ? endpointPart : `http://${endpointPart}`;
-      const url = new URL(normalized);
-      scheme = (url.protocol.replace(':', '') || 'http').toLowerCase();
-      host = url.hostname;
-      port = Number(url.port || 0);
-      username = decodeURIComponent(url.username || '');
-      password = decodeURIComponent(url.password || '');
-    } catch {
-      const m = endpointPart.match(/^(?:(https?|socks5|socks4):\/\/)?(?:([^:@]+):([^@]*)@)?([^:]+):(\d+)$/i);
-      if (!m) return;
-      scheme = (m[1] || 'http').toLowerCase();
-      username = m[2] || '';
-      password = m[3] || '';
-      host = m[4] || '';
-      port = Number(m[5] || 0);
-    }
-    if (!host || port <= 0) return;
-    rows.push({
-      country,
-      endpoint: {
-        enabled: true,
-        scheme,
-        host,
-        port,
-        username,
-        password,
-        label: `出口/${country}`,
-      },
-    });
-  });
-  return rows;
 }
 
 function bindProbePanel(): void {
