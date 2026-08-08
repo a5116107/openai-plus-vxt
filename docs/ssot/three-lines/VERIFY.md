@@ -4,9 +4,9 @@
 | 项 | 状态 | 说明 |
 |---|---|---|
 | FPI 清理不硬停 | PASS | 0.0.19 已过用户截图 |
-| 选邮箱有账号供给 | FIXED→待装包验证 | 0.0.20 补邮箱导入；此前只接了 mailbox_proxy |
-| 注册→探测 handoff | PASS 代码 | 仍需有成功 session |
-| 智能开跑 | PASS 代码 | 依赖探测池账号 |
+| 选邮箱有账号供给 | PASS | 0.0.37 浏览器链已验证 Acica 同步、随机选择与邮箱轮换 |
+| 注册→探测 handoff | PASS | 真实 mailbox URL 浏览器链已形成 Session、Checkout 与探测池交接 |
+| 智能开跑 | PASS | 受控资格与看板 E2E 已验证；公网资格结果仍取决于 live profile |
 
 ## 逻辑线
 | 项 | 状态 |
@@ -19,5 +19,5 @@
 | 项 | 状态 |
 |---|---|
 | 出口环境 C | PASS 代理接入 |
-| 账号供给 B | 0.0.20 补邮箱池入口；跑通仍依赖 OTP 服务 8787 |
-| 撞资格资产 A | 依赖 B 产出 session |
+| 账号供给 B | PASS；Acica 与 mailbox URL 两条取件路径均有浏览器证据 |
+| 撞资格资产 A | PASS（受控流程）；公网命中需显式 live profile |

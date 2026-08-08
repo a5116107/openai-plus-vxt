@@ -24,4 +24,4 @@
 
 - 在线上游真实产生了 `US$0.00` Checkout，但修复前逻辑未入库；修复后确定性真扩展 E2E 已入库，线上重跑受 Cloudflare challenge 和 seed 连接失败影响，所以“修复版在线完整成功证据”保持待复测。
 - 当前历史样本支持 Checkout 国家/路线具有较强稳定关联，但具体 IP、账号主效应和随机性仍存在混杂，继续按平衡实验积累。
-- 仓库存在大量会话前已有改动，发布工作流的 clean-worktree 门禁作为工作区例外记录，不覆盖本轮编译、E2E、lint 和制品哈希证据。
+- 0.0.37 隔离收口工作树已 clean，`quality-guard review-entry --no-chain` 为 SUCCESS；在线完整成功证据仍按 OC-09 保持待复测。

@@ -9,4 +9,4 @@
 | mailbox_acica_export 解析 | 485 行可用 | PASS（本机 smoke） |
 | mailbox_tokens --- 三段式 | 自动补 client_id | PASS（本机 smoke） |
 | 设置页导入按钮 | 导入 Register-Tool 邮箱 | PASS（构建产物含按钮） |
-| 用户浏览器实测选邮箱 | 保存后 count>0 可过选择邮箱 | PENDING（需用户装 0.0.20 导入后重跑） |
+| 用户浏览器实测选邮箱 | 保存后 count>0 可过选择邮箱 | PASS（后续真实浏览器已完成 Acica 同步、随机选邮箱、OTP、Session 与 Checkout；见 `e2e-user-mailbox-retry` 证据） |

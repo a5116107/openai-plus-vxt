@@ -36,7 +36,7 @@
 - [x] `pnpm test:payment-runner` 通过，10/10。
 - [x] `pnpm build:firefox` 通过并记录产物。
 - [x] Firefox XPI manifest、关键模块、版本和 SHA-256 已复核。
-- [x] `quality-guard review-entry` 已产出当前请求链证据；仓库级严格门因历史约 100 个未提交文件、全局变更预算和既有超大文件判定 FAILED，本轮行为门结果单独列示。
+- [x] `quality-guard review-entry --no-chain` 已产出当前请求链证据并通过；全局 change/shape budget 与既有超大文件作为 advisory 结构债务单独列示。
 - [x] 当前 Firefox XPI 已按 ZIP/XPI 兼容格式生成并核对关键文件。
 - [x] Hosted/PayPal 按实际 Checkout 国家与币种解析，区域方式保持固定档案约束。
 - [x] 默认 Runner 候选来自 Stripe 实际探测；未暴露方式只在显式实验开关下筛查。
@@ -54,13 +54,21 @@
 - XPI 只读归档复核：manifest `0.0.30`，Gecko ID `openai-plus-vxt@local.opx`，`incognito=spanning`，20 个文件；设置页、Runner 四个 revalidate checkpoint、MoMo/GoPay 白名单及 Runner 看板均存在。
 - `dist/openai-plus-vxt-0.0.30.xpi` SHA-256：`44ABEE85F3E97963F78C4B4448911C6B8E75EF602E0E243D50DC94D08BC26C06`。
 - `dist/openai-plus-vxt-0.0.30-mullvad.xpi` SHA-256：`44ABEE85F3E97963F78C4B4448911C6B8E75EF602E0E243D50DC94D08BC26C06`。
-- `quality-guard review-entry`：当前请求链产物已生成；仓库级 verdict 为 FAILED，主因是合并工作区的全局 change/shape/anti-mud budget，不代表上述 Runner 行为测试或构建失败。
+- 历史共享工作区曾因全局 change/shape/anti-mud budget 返回 FAILED；0.0.37 隔离收口已由下方 SUCCESS 记录取代，历史结果不再代表当前质量门。
 - `pnpm test:payment-runner`：PASS，13/13；新增“方式未暴露时在 screen 止步”与“同一资格 Checkout 的保持证据”断言。
 - `pnpm test:probe-readiness`：PASS，15/15；默认复用模式、独立对照开关、未暴露方式实验候选选择和 `forced=true` CSV 审计字段均通过。
 - `pnpm compile`、`pnpm build`、`pnpm build:firefox`、`pnpm zip:firefox`：PASS；Firefox XPI 位于 `.output/openai-plus-vxt-0.0.34-firefox.xpi`。
 - XPI SHA-256：`664BEAC6FC15334289CE1C0E2B6E96CB987DF55C52816E8178F0555A5B842EAC`；已确认包含 `manifest.json`、`background.js`、`automation-settings.html`。
 - `node scripts/e2e-eligibility-dashboard.mjs`：PASS；版本 `0.0.34`，42 项界面、CSV/JSON 往返、移动端无横向溢出、页面/控制台 0 errors 均通过。超长页截图协议错误已在测试脚本中降级为视口证据采集，业务断言仍完整执行。
-- `node scripts/e2e-proxy-stages.mjs`：运行完成但未通过三出口断言；本地四条 seed 实测只产出 JP `27.91.151.227` 与 VE `154.45.138.144` 两个唯一 IP，Billing 被代码正确拒绝为重复出口。要满足“三阶段不同动态出口”，当前环境需要提供至少三个经出口验证的唯一 IP。
+- 历史真实 seed 运行 `node scripts/e2e-proxy-stages.mjs` 未通过三出口断言：当时只产出 JP 与 VE 两个唯一 IP，Billing 被正确拒绝为重复出口；该记录只描述当时外部供应状态。
+
+## 2026-08-08 0.0.37 收口复核
+
+- `pnpm tsx --test tests/*.test.ts`：PASS，125/125；包含 forced probe 不晋级、`link_ready` 恢复不重放和终链资格保持。
+- `pnpm test:e2e-proxy-stages`：PASS；自包含 Auth/Checkout/Billing 三代理 IP、国家、ASN 互异，阶段内黏性、顺序、去重和下一周期稳定性全部通过。
+- `pnpm build`、`pnpm build:firefox`：PASS，Chrome MV3 与 Firefox MV2 均约 1.48 MB。
+- `quality-guard review-entry --no-chain`：SUCCESS，仓库工作树 clean，blocker=0；change/shape budget 作为迁移结构债务保留 advisory。
+- 真实多出口与真实支付结果仍以显式 live profile 为准，自包含 fixture 不替代公网资格结论。
 
 ## 2026-08-01 Hosted/PayPal 动态能力复核
 

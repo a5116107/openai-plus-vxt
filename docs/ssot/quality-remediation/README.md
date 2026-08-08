@@ -8,16 +8,17 @@
 | 安全文档 | 缺少 `docs/standards/APPSEC_BASELINE.md` 与 10 个控制项 | 按扩展真实边界补齐适用性、证据、验证和残余风险 |
 | 门禁运行时 | 根包为 ESM，CommonJS guardrail `.js` 加载失败 | 在 `scripts/guardrails/package.json` 声明局部 `commonjs` |
 | 证据时效 | P1-P4 命令证据旧于代码 | 所有实现完成后重新执行 execute/verify 链刷新 |
-| 工作流工具 | memory-index/graph/digest 在母技能入口失败 | 单独记录工具故障，不与 TypeScript、构建和浏览器结果混为一类 |
+| 工作流工具 | bootstrap guardrail 与根 ESM 边界冲突 | 通过局部 CommonJS 边界修复；memory、stack-run 和 evidence 链均可执行 |
 | 验证范围 | 自动探测把 `.ref_upl` 参考仓库及根目录一次性 Python 迁移脚本识别为产品 Python 变更，其上游语法错误导致证据门失败 | 从 `WORKFLOW_STACK` 移除参考样本，并通过 `.gitignore` 隔离 `.ref_upl/` 与 `/_*.py`；保留根扩展与真实邮箱服务验证 |
 
 ## 验收原则
 
 - 业务能力以编译、合成排程测试和真实扩展浏览器 E2E 为准。
 - AppSec 以 10 个控制项可解析、守卫命令实际运行和残余风险公开为准。
-- skills consistency、stack-run、quality-guard 必须保留命令输出；历史脏工作区告警不伪装为本轮代码失败。
+- skills consistency、stack-run、quality-guard 必须保留命令输出；本地 bootstrap 代理使用 Git 本地排除清单，不进入产品提交。
 - 本地交付验证使用 `--no-chain` 停在 verify，避免把未请求的 GitHub 同步和部署事务作为 XPI 验收前置条件。
-- 最后生成 0.0.26 Firefox XPI 与 Mullvad XPI，并计算 SHA-256。
+- 0.0.37 Chrome ZIP 与 Firefox XPI 已发布到 fork 预发布，并记录 SHA-256 与回滚说明。
+- 184 文件迁移超过 change/shape budget 的事实保持 advisory 结构债务，不伪造严格预算 PASS。
 
 ## 2026-07-29 全流程回归补充
 
@@ -26,3 +27,10 @@
 - 清理阶段曾在读取目标标签页时存在无界等待。`triggerStartCleanup()` 现有 5 秒边界；受控失效目标标签页回归已确认该路径仍继续后续自动化，不再占满全流程超时。
 - 本轮未获得真实优惠命中，`hitDatabase` 为 0；命中保存与看板仅通过合成/浏览器看板回归，真实命中入库维持未验证状态。
 - E2E 证据输出已改为递归脱敏，避免将邮箱、验证码、会话令牌或查询参数写入新结果文件。
+
+## 2026-08-08 0.0.37 收口
+
+- `docs/specs/WORKFLOW_STACK.json` 与 `docs/standards/APPSEC_BASELINE.md` 已纳入版本控制，AppSec 控制项 10/10。
+- `scripts/guardrails/package.json` 将 guardrail `.js` 限定为 CommonJS，消除了根包 ESM 导致的 `require is not defined` 连锁失败。
+- `quality-guard review-entry --no-chain` 返回 SUCCESS；spec、quality、verify-evidence、proof bundle 和 review loop blocker 均为 0。
+- TypeScript、125 项测试、3 项后端测试、双端构建、三阶段出口 E2E 和 Plus Closure fixture 全部通过。

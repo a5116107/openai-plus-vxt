@@ -94,7 +94,7 @@
 - [x] `dist/saved-payment-rollback-0.0.37.md`：第一动作关闭 `opx.savedPaymentMethods.feature.enabled`，并回链上一 Firefox 产物。
 - [x] 生产代码 secret-shaped 扫描未发现具体 PK、client secret 或卡号 fixture；桥回包测试证明不含请求中的 PK/client secret。
 - [x] `quality-guard review-entry` 已在当前闭环请求指纹 `06ea161d70766098` 下运行：`spec.verdict`、`quality.verdict`、`verify.evidence` 均为 PASS，任务复核 5/5、0 blocking；专项 E2E 薄入口与 runner 均无 structural-quality finding。
-- [x] fork 发布已完成：`a5116107/openai-plus-vxt` 的 `main` 和集成分支均指向 `57d0c92`，预发布 `v0.0.37-ssot.1` 已上传双端产物、哈希清单和回滚说明。
+- [x] fork 发布已完成：`a5116107/openai-plus-vxt` 的 `main` 和集成分支已同步 0.0.37 集成结果，预发布 `v0.0.37-ssot.1` 已上传双端产物、哈希清单和回滚说明。
 - [ ] 上游交付仍受权限门阻断：向 `suyancc/openai-plus-vxt` 推送返回 403，当前令牌也无权创建上游 PR。
 - [ ] 最新严格质量总门仍受迁移规模和结构预算阻断；功能测试、双端构建、浏览器夹具与敏感信息扫描均通过，但 change/shape budget 和既有超大文件未被标记为 PASS。
 

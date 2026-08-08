@@ -61,12 +61,12 @@
 
 ## 2026-08-08 SSOT 集成交付
 
-- 集成提交：`57d0c9214066348f9a7166f1a1adc54c2f1c2faf`；已合并 `codex/tpp-delivery` 的 forced-probe、完成 checkpoint 不重放和三阶段代理夹具修复。
+- 集成内容：已合并 `codex/tpp-delivery` 的 forced-probe、完成 checkpoint 不重放和三阶段代理夹具修复，并完成 workflow/AppSec 收口。
 - 验证：TypeScript `125/125`、Saved Payment 后端 `3/3`、Chrome/Firefox 构建、三阶段代理、Plus closure、Saved Payment UI、自动化资格和资格看板夹具均通过。
 - 发布：fork `a5116107/openai-plus-vxt` 的 `main` 与 `codex/full-ssot-integration` 均指向集成提交；预发布 `v0.0.37-ssot.1` 已上传 Chrome ZIP、Firefox XPI、发布清单和回滚说明。
 - 产物 SHA-256：Chrome ZIP `4fa4db10814dd4c8514d2f357311ef100e7a2b3a3af1db31730a671a8fd74693`；Firefox XPI `5739225446632b2e613ea9185216ecdeacb30c551a29456861f6d9a5e946f008`。
 - 上游状态：`suyancc/openai-plus-vxt` 写入返回 403，当前令牌也缺少创建上游 PR 的权限；上游 `main` 仍为 `d856454f82e7fce14c35603a72e0f2f3e1ca69e9`。
-- 最新严格质量门：功能、安全与测试证据通过；总门因 184 文件迁移超过 change/shape budget，以及 `src/features/probe/analysis.ts` 等既有超大文件而保持阻塞，未伪造 PASS。
+- 最新质量复核：`quality-guard review-entry --no-chain` 为 SUCCESS，spec/quality/verify-evidence/proof/review blocker 均为 0；184 文件迁移的 change/shape budget 与既有超大文件继续作为 advisory 结构债务，未伪造严格预算 PASS。
 
 ## Plus 双 Checkout 闭环
 
@@ -89,7 +89,7 @@
 | Gate | 必须证明 | 建议命令/证据 | 状态 |
 | --- | --- | --- | --- |
 | V-01 URL | `oaics_`、`cs_`、verify、success 统一解析 | 全量测试中的 4 项 Checkout reference fixture | PASS |
-| V-02 回归 | 旧 `cs_live_` 和 PayPal 流程未破坏 | `pnpm tsx --test tests/*.test.ts`，113/113 | PASS |
+| V-02 回归 | 旧 `cs_live_` 和 PayPal 流程未破坏 | `pnpm tsx --test tests/*.test.ts`，125/125 | PASS |
 | V-03 Checkout policy | direct/staged/server 使用同一请求模型 | Checkout pipeline policy/strict-zero tests | PASS |
 | V-04 server 出口 | 返回实际 IP/country/colo/ASN/verified | server trace fixture 严格信任显式 `verified` | PASS |
 | V-05 SPM-16 | test SetupIntent succeeded、attached/reusable/default | immutable `saved-payment-live-e2e/pcc-live-7b2c128f-cab4-4121-8146-85eff4931b85.json`：succeeded，三项复核均为 true，服务端列表 contains/default 一致 | PASS |
