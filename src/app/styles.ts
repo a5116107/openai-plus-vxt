@@ -1492,6 +1492,163 @@ export const PANEL_STYLES = `
   overflow-wrap: anywhere;
 }
 
+.opx-payment-account {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 46px;
+  padding: 8px 0 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.opx-payment-account > .opx-button {
+  width: auto;
+  min-width: 54px;
+  margin: 0;
+}
+
+.opx-payment-account-copy,
+.opx-payment-method-row > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.opx-payment-account-copy strong,
+.opx-payment-method-row strong {
+  color: #e5f7ef;
+  font-size: 12px;
+  line-height: 17px;
+  overflow-wrap: anywhere;
+}
+
+.opx-payment-account-copy span,
+.opx-payment-method-row span,
+.opx-payment-policy-row span {
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.opx-payment-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.opx-payment-section h3 {
+  margin: 0;
+  color: #dcfce7;
+  font-size: 13px;
+  line-height: 18px;
+  letter-spacing: 0;
+}
+
+.opx-payment-section-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.opx-payment-section-head h3 {
+  white-space: nowrap;
+}
+
+.opx-payment-section-head > .opx-button {
+  width: auto;
+  min-width: 88px;
+  margin: 0;
+}
+
+.opx-payment-section > .opx-button {
+  margin-bottom: 0;
+}
+
+.opx-payment-add-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.opx-payment-method-list,
+.opx-payment-policy-list {
+  display: grid;
+  gap: 6px;
+}
+
+.opx-payment-method-group {
+  min-height: 18px;
+  color: #93e4bd;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.opx-payment-method-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  padding: 7px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  background: rgba(17, 24, 39, 0.62);
+}
+
+.opx-payment-badge {
+  min-width: 40px;
+  padding: 3px 6px;
+  border: 1px solid rgba(47, 209, 124, 0.42);
+  border-radius: 999px;
+  color: #bbf7d0 !important;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.opx-payment-policy-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.opx-payment-policy-row strong {
+  color: #93e4bd;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.opx-payment-empty {
+  min-height: 38px;
+  padding: 8px;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 20px;
+}
+
+@media (max-width: 420px) {
+  .opx-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+
+  .opx-tab {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 4px;
+  }
+
+  .opx-payment-add-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-height: 640px) {
   .opx-shell {
     top: 12px;

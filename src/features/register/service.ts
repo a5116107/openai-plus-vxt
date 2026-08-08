@@ -1,13 +1,14 @@
+import { DEFAULT_ACICA_MAILBOX_SETTINGS, normalizeAcicaMailboxSettings } from '../mailbox/acica';
 import { getBrowserTab, sendActiveTabMessage, sendTabMessage } from '../../app/active-tab';
 import { PAGE_ACTION } from '../../app/page-actions';
-import { loadRegisterState, saveRegisterState } from '../../app/state';
+import { loadAutomationState, loadRegisterState, saveRegisterState } from '../../app/state';
 import { parseAccountInput } from './account-input';
 import { isPhoneVerificationPath } from './phone-verification-url';
 import type { RegisterReadyKind } from './page-ready';
 import type { ActionResult, PageState, RegisterState } from './types';
 import { countryIsoToCallingCode } from '../oauth-phone/country-map';
 
-export const CHATGPT_REGISTER_URL = 'https://chatgpt.com/auth/login';
+export const CHATGPT_REGISTER_URL = 'https://chatgpt.com/auth/login?screen_hint=signup';
 
 const OUTLOOK_OTP_TIMEOUT_MS = 180_000;
 const OUTLOOK_OTP_INTERVAL_MS = 5_000;
@@ -18,6 +19,7 @@ const REGISTER_PASSWORD_ELEMENT_READY_TIMEOUT_MS = 15_000;
 const REGISTER_EMAIL_NAVIGATION_TIMEOUT_MS = 60_000;
 const REGISTER_EMAIL_PAGE_LOAD_TIMEOUT_MS = 20_000;
 const REGISTER_PHONE_NAVIGATION_TIMEOUT_MS = 60_000;
+const REGISTER_PAGE_ACTION_TIMEOUT_MS = 25_000;
 const DEFAULT_REGISTER_PHONE_PASSWORD = 'openaiplusvxt';
 
 let autoOutlookOtpStarted = false;
@@ -107,13 +109,43 @@ export async function fillRegisterEmailFromCurrentInput(tabId?: number): Promise
     return submit;
   }
   const parsed = submit.parsed;
-  const progress = await waitForRegisterEmailProgress(REGISTER_EMAIL_NAVIGATION_TIMEOUT_MS, parsed.email, tabId);
+  let progress = await waitForRegisterEmailProgress(8_000, parsed.email, tabId);
+  let trustedMessage = '';
+  if (!progress.ok && typeof tabId === 'number') {
+    const trusted = await requestTrustedEmailFill(tabId, parsed.email);
+    trustedMessage = trusted.message;
+    if (trusted.ok) {
+      progress = await waitForRegisterEmailProgress(REGISTER_EMAIL_NAVIGATION_TIMEOUT_MS, parsed.email, tabId);
+    }
+  }
   if (!progress.ok) {
     const debug = await getRegisterDebugState(parsed.email, tabId);
-    return failWithData(`${submit.result.message}；${progress.message}`, debug.data || progress.data || submit.result.data);
+    const submitData = isObjectRecord(submit.result.data) ? submit.result.data : {};
+    const progressData = isObjectRecord(progress.data) ? progress.data : {};
+    const debugData = isObjectRecord(debug.data) ? debug.data : {};
+    return failWithData(
+      `${submit.result.message}；${trustedMessage ? `${trustedMessage}；` : ''}${progress.message}`,
+      { ...submitData, ...progressData, ...debugData },
+    );
   }
 
-  return buildRegisterEmailSuccess(submit.result, progress, submit.canAutoOtp, submit.shouldAutoOtp, submit.apiMessage);
+  const submitted = trustedMessage
+    ? { ...submit.result, message: `${submit.result.message}；${trustedMessage}` }
+    : submit.result;
+  return buildRegisterEmailSuccess(submitted, progress, submit.canAutoOtp, submit.shouldAutoOtp, submit.apiMessage);
+}
+
+async function requestTrustedEmailFill(tabId: number, email: string): Promise<ActionResult> {
+  try {
+    const response = await browser.runtime.sendMessage({
+      type: 'opx:trusted-fill-email',
+      tabId,
+      email,
+    }) as ActionResult | undefined;
+    return response || { ok: false, message: '受信任输入回退没有返回状态' };
+  } catch (error) {
+    return { ok: false, message: `受信任输入回退不可用：${error instanceof Error ? error.message : String(error)}` };
+  }
 }
 
 export async function submitRegisterEmailOnly(tabId?: number): Promise<ActionResult> {
@@ -309,8 +341,9 @@ export async function waitForOutlookOtpAndSubmit(options: OutlookOtpWaitOptions 
   }
 
   const state = await loadRegisterState();
-  if (!state.accountLine) {
-    return fail('当前输入不是 Outlook 账号行，不能自动接收验证码');
+  const accountLine = state.accountLine || state.email || '';
+  if (!accountLine) {
+    return fail('没有当前邮箱，不能自动接收验证码');
   }
 
   const jobId = makeOtpJobId();
@@ -319,13 +352,14 @@ export async function waitForOutlookOtpAndSubmit(options: OutlookOtpWaitOptions 
     otpAutoPending: false,
     otpJobId: jobId,
     otpLastStartedAt: Date.now(),
-    otpLastMessage: `正在自动接收 ${state.email || accountEmail(state.accountLine)} 的验证码`,
+    otpLastMessage: `正在自动接收 ${state.email || accountEmail(accountLine) || accountLine} 的验证码`,
   });
 
   const response = await browser.runtime.sendMessage({
     type: 'opx:wait-outlook-otp',
+      acica: normalizeAcicaMailboxSettings((await loadAutomationState().catch(() => null))?.settings?.acicaMailbox || DEFAULT_ACICA_MAILBOX_SETTINGS),
     jobId,
-    accountLine: state.accountLine,
+    accountLine: accountLine,
     apiBase: state.apiBase,
     since: options.since ?? (state.otpRequestedAt || state.updatedAt || Date.now()),
     timeoutMs: options.timeoutMs ?? OUTLOOK_OTP_TIMEOUT_MS,
@@ -343,19 +377,28 @@ export async function waitForOutlookOtpAndSubmit(options: OutlookOtpWaitOptions 
   }
 
   if (!response.ok || !response.code) {
+    const failureKind = (response as ActionResult & { failureKind?: string }).failureKind;
     await saveRegisterState({
       otpAutoRunning: false,
       otpAutoPending: false,
       otpJobId: '',
       otpLastMessage: response.message,
     });
-    return response;
+    return {
+      ...response,
+      data: failureKind ? { mailboxOtpFailure: failureKind } : undefined,
+    };
   }
 
-  const fillResult = await sendPageAction<ActionResult>({
-    type: PAGE_ACTION.registerFillOtp,
-    code: response.code,
-  }, options.tabId);
+  const trustedFill = typeof options.tabId === 'number'
+    ? await requestTrustedOtpFill(options.tabId, response.code)
+    : { ok: false, message: '缺少验证码目标标签页' };
+  const fillResult = trustedFill.ok
+    ? trustedFill
+    : await sendPageAction<ActionResult>({
+        type: PAGE_ACTION.registerFillOtp,
+        code: response.code,
+      }, options.tabId);
   await saveRegisterState({
     otpAutoRunning: false,
     otpAutoPending: false,
@@ -368,6 +411,19 @@ export async function waitForOutlookOtpAndSubmit(options: OutlookOtpWaitOptions 
     code: response.code,
     message: fillResult.ok ? `已收到并提交验证码：${response.code}` : fillResult.message,
   };
+}
+
+async function requestTrustedOtpFill(tabId: number, code: string): Promise<ActionResult> {
+  try {
+    const response = await browser.runtime.sendMessage({
+      type: 'opx:trusted-fill-otp',
+      tabId,
+      code,
+    }) as ActionResult | undefined;
+    return response || { ok: false, message: '验证码受信任输入没有返回状态' };
+  } catch (error) {
+    return { ok: false, message: `验证码受信任输入不可用：${error instanceof Error ? error.message : String(error)}` };
+  }
 }
 
 export async function stopOutlookOtp(): Promise<ActionResult> {
@@ -586,7 +642,7 @@ async function waitForRegisterEmailProgress(navigationTimeoutMs: number, email: 
   return {
     ok: false,
     message: `提交邮箱后 ${Math.round(navigationTimeoutMs / 1000)} 秒内没有跳转到邮箱验证码页，最后页面：${shortUrl(lastUrl) || '未知'}`,
-    data: { url: lastUrl, pageKind: lastKind, tabStatus: lastStatus },
+    data: { url: lastUrl, pageKind: lastKind, tabStatus: lastStatus, emailSubmitProgressTimeout: true },
   };
 }
 
@@ -989,7 +1045,7 @@ export async function autoStartOutlookOtpIfNeeded(): Promise<void> {
   }
 
   const state = await loadRegisterState();
-  if (!state.autoOtp || !state.otpAutoPending || state.otpAutoRunning || !state.accountLine) {
+  if (!state.autoOtp || !state.otpAutoPending || state.otpAutoRunning || !(state.accountLine || state.email)) {
     return;
   }
 
@@ -1023,9 +1079,18 @@ export async function checkLocalOutlookApi(apiBase: string): Promise<ActionResul
 
 async function sendPageAction<T extends ActionResult>(message: unknown, tabId?: number): Promise<T> {
   try {
-    const response = typeof tabId === 'number' && tabId > 0
-      ? await sendTabMessage<unknown>(message, tabId)
-      : await sendActiveTabMessage<unknown>(message);
+    const action = typeof tabId === 'number' && tabId > 0
+      ? sendTabMessage<unknown>(message, tabId)
+      : sendActiveTabMessage<unknown>(message);
+    const response = await Promise.race([
+      action,
+      delay(REGISTER_PAGE_ACTION_TIMEOUT_MS).then(() => ({
+        __opxTimeout: true,
+      })),
+    ]);
+    if (isObjectRecord(response) && response.__opxTimeout === true) {
+      return fail(`页面操作响应超时（${Math.round(REGISTER_PAGE_ACTION_TIMEOUT_MS / 1000)} 秒），页面可能仍在加载或网络已中断`) as T;
+    }
     if (isActionResult(response)) {
       return response as T;
     }

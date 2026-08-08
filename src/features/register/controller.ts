@@ -7,7 +7,7 @@ import type { ActionResult, PageState, RegisterController } from './types';
 
 let autoProfileStarted = false;
 let autoOtpStarted = false;
-const CHATGPT_REGISTER_URL = 'https://chatgpt.com/auth/login';
+const CHATGPT_REGISTER_URL = 'https://chatgpt.com/auth/login?screen_hint=signup';
 const OUTLOOK_OTP_TIMEOUT_MS = 180_000;
 const OUTLOOK_OTP_INTERVAL_MS = 5_000;
 

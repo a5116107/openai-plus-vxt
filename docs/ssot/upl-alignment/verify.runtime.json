@@ -1,0 +1,31 @@
+{
+  "at": "2026-07-28T14:43:33.024Z",
+  "checks": [
+    {
+      "id": "T-P0-01",
+      "pass": true,
+      "evidence": "types + DEFAULT_PROBE_TASK_CONFIG + normalizeTaskConfig include staged fields"
+    },
+    {
+      "id": "T-P0-02",
+      "pass": true,
+      "evidence": "stage proxy resolver hooks applyProbeProxy per bootstrap/promotion/provider country"
+    },
+    {
+      "id": "T-P0-03",
+      "pass": true,
+      "evidence": "create→update→taxes pipeline exists and probe run path branches to it"
+    },
+    {
+      "id": "T-P0-04",
+      "pass": true,
+      "evidence": "requireZero gate in checkout pipeline + probe service double-check"
+    },
+    {
+      "id": "T-P0-05",
+      "pass": true,
+      "evidence": "automation-settings form controls + fill/collect wired"
+    }
+  ],
+  "allPass": true
+}

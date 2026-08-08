@@ -1,0 +1,31 @@
+{
+  "at": "2026-07-28T15:07:01.335Z",
+  "checks": [
+    {
+      "id": "T-P1-01",
+      "pass": true,
+      "evidence": "payment method profiles + stage country + url matcher"
+    },
+    {
+      "id": "T-P1-02",
+      "pass": true,
+      "evidence": "final url extractor + optional stripe confirm"
+    },
+    {
+      "id": "T-P1-03",
+      "pass": true,
+      "evidence": "per-method three-stage pools + runtime pick/apply"
+    },
+    {
+      "id": "T-P1-04",
+      "pass": true,
+      "evidence": "probe config + UI wiring for extract and pools"
+    },
+    {
+      "id": "T-P1-02-runtime-patterns",
+      "pass": true,
+      "evidence": "pattern smoke upi/ideal/hosted"
+    }
+  ],
+  "allPass": true
+}

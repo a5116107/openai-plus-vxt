@@ -135,6 +135,80 @@ export async function submitCurrentOpenAiCheckout(address: AddressProfile, tabId
   return { ok: false, message: '当前上下文不支持提交 OpenAI 支付页' };
 }
 
+interface StripeSavedCardFrameResult {
+  ok: boolean;
+  foundFrame: boolean;
+  found: boolean;
+  selected: boolean;
+  last4: string;
+  availableLast4: string[];
+  message: string;
+}
+
+export async function selectCurrentOpenAiSavedCard(expectedLast4: string, tabId?: number): Promise<ActionResult> {
+  if (!/^\d{4}$/.test(expectedLast4)) return { ok: false, message: 'Saved Card 后四位格式无效' };
+  const tab = await getBrowserTab(tabId);
+  if (!isContentScriptUrl(tab?.url) || typeof tab?.id !== 'number') {
+    return { ok: false, message: '自动化目标标签页不是 OpenAI 支付页' };
+  }
+  const main = await sendTabMessage<ActionResult>({ type: PAGE_ACTION.openAiSelectSavedCard, expectedLast4 }, tab.id);
+  const stripe = await selectStripeSavedCardFrame(tab.id, expectedLast4);
+  if (main.ok || stripe.selected) {
+    return {
+      ok: true,
+      message: [main.ok ? main.message : '', stripe.selected ? stripe.message : ''].filter(Boolean).join('；'),
+      data: { expectedLast4, selected: true, main, stripe },
+    };
+  }
+  return { ok: false, message: 'SAVED_CARD_NOT_FOUND', data: { expectedLast4, selected: false, main, stripe } };
+}
+
+export async function fillCurrentOpenAiBillingAddress(address: AddressProfile, tabId?: number): Promise<ActionResult> {
+  const tab = await getBrowserTab(tabId);
+  if (!isContentScriptUrl(tab?.url) || typeof tab?.id !== 'number') {
+    return { ok: false, message: '自动化目标标签页不是 OpenAI 支付页' };
+  }
+  const stripe = await fillStripeAddressFramesIfNeeded(tab.id, address, true);
+  const main = await sendTabMessage<ActionResult>({ type: PAGE_ACTION.openAiFillBilling, address }, tab.id);
+  const ok = stripe.foundFrame ? stripe.ok : main.ok;
+  return { ok, message: [stripe.message, main.message].filter(Boolean).join('；'), data: { stripe, main } };
+}
+
+export async function verifyCurrentOpenAiBillingAddress(address: AddressProfile, tabId?: number): Promise<ActionResult> {
+  const tab = await getBrowserTab(tabId);
+  if (!isContentScriptUrl(tab?.url) || typeof tab?.id !== 'number') {
+    return { ok: false, message: '自动化目标标签页不是 OpenAI 支付页' };
+  }
+  const stripe = await fillStripeAddressFramesOnce(tab.id, address);
+  const main = await sendTabMessage<ActionResult>({ type: PAGE_ACTION.openAiVerifyBilling, address }, tab.id);
+  const ok = stripe.foundFrame ? stripe.ok : main.ok;
+  return { ok, message: ok ? 'billing address 回读通过' : 'BILLING_VERIFY_FAILED', data: { country: address.countryCode, stripe, main } };
+}
+
+export async function submitCurrentQualifiedOpenAiCheckout(input: {
+  expectedLast4: string;
+  address: AddressProfile;
+  submitKey: string;
+  tabId?: number;
+}): Promise<ActionResult> {
+  const selected = await selectCurrentOpenAiSavedCard(input.expectedLast4, input.tabId);
+  if (!selected.ok) return selected;
+  const billing = await verifyCurrentOpenAiBillingAddress(input.address, input.tabId);
+  if (!billing.ok) return billing;
+  const tab = await getBrowserTab(input.tabId);
+  if (!isContentScriptUrl(tab?.url) || typeof tab?.id !== 'number') {
+    return { ok: false, message: '自动化目标标签页不是 OpenAI 支付页' };
+  }
+  return sendTabMessage<ActionResult>({
+    type: PAGE_ACTION.openAiSubmitQualifiedCheckout,
+    expectedLast4: input.expectedLast4,
+    billingCountry: input.address.countryCode.toUpperCase(),
+    selectionVerified: true,
+    billingVerified: true,
+    submitKey: input.submitKey,
+  }, tab.id);
+}
+
 export async function openCurrentPaypalAccountEntry(tabId?: number): Promise<ActionResult> {
   if (isExtensionPage()) {
     const tab = await getBrowserTab(tabId);
@@ -226,6 +300,60 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function selectStripeSavedCardFrame(tabId: number, expectedLast4: string): Promise<StripeSavedCardFrameResult> {
+  try {
+    const results: Array<{ result?: StripeSavedCardFrameResult }> = await browser.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      args: [expectedLast4],
+      func: selectSavedCardInStripeFrame,
+    });
+    const frames = results.map((item) => item.result).filter((item): item is StripeSavedCardFrameResult => Boolean(item?.foundFrame));
+    return frames.find((item) => item.selected) || frames.find((item) => item.found) || frames[0] || {
+      ok: false, foundFrame: false, found: false, selected: false, last4: '', availableLast4: [], message: '未检测到 Stripe Saved Card 子框架',
+    };
+  } catch (error) {
+    return {
+      ok: false, foundFrame: true, found: false, selected: false, last4: '', availableLast4: [],
+      message: `Stripe Saved Card 子框架注入失败：${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+async function selectSavedCardInStripeFrame(expectedLast4: string): Promise<StripeSavedCardFrameResult> {
+  const foundFrame = location.hostname === 'js.stripe.com' && /elements-inner-(?:payment|checkout|tabs)/.test(location.pathname);
+  if (!foundFrame) return { ok: true, foundFrame: false, found: false, selected: false, last4: '', availableLast4: [], message: '当前不是 Stripe payment frame' };
+  const visible = (element: Element): boolean => {
+    const style = getComputedStyle(element as HTMLElement);
+    const rect = (element as HTMLElement).getBoundingClientRect();
+    return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+  };
+  const selected = (element: HTMLElement): boolean => {
+    const input = element.matches('input') ? element as HTMLInputElement : element.querySelector<HTMLInputElement>('input[type="radio"]');
+    return Boolean(input?.checked || element.getAttribute('aria-selected') === 'true' || element.getAttribute('aria-checked') === 'true' || element.closest('[aria-selected="true"], [aria-checked="true"], .selected, .Selected'));
+  };
+  const items = Array.from(document.querySelectorAll<HTMLElement>('button, label, [role="radio"], [role="tab"], [data-testid], [aria-label], input[type="radio"]'))
+    .filter(visible)
+    .map((element) => {
+      const text = [element.textContent, element.getAttribute('aria-label'), element.getAttribute('data-testid'), element.getAttribute('value')].join(' ');
+      const match = text.match(/(?:••••|\*{4}|ending(?:\s+in)?|last\s*4)?\s*(\d{4})(?!\d)/i);
+      const target = element.matches('input') ? element.closest<HTMLElement>('label, button, [role="radio"], [data-testid]') || element : element;
+      return match ? { element: target, last4: match[1] } : null;
+    })
+    .filter((item): item is { element: HTMLElement; last4: string } => Boolean(item));
+  const availableLast4 = [...new Set(items.map((item) => item.last4))];
+  const target = items.find((item) => item.last4 === expectedLast4);
+  if (!target) return { ok: false, foundFrame: true, found: false, selected: false, last4: '', availableLast4, message: 'SAVED_CARD_NOT_FOUND' };
+  if (!selected(target.element)) {
+    target.element.click();
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+  const isSelected = selected(target.element);
+  return {
+    ok: isSelected, foundFrame: true, found: true, selected: isSelected, last4: isSelected ? expectedLast4 : '', availableLast4,
+    message: isSelected ? `Stripe Saved Card •••• ${expectedLast4} 已选中` : 'Saved Card 选中状态回读失败',
+  };
+}
+
 async function selectStripePaypalFrameIfNeeded(tabId: number | undefined): Promise<StripePaypalFrameSelectResult> {
   if (typeof tabId !== 'number') {
     return { ok: true, foundFrame: false, foundPaypal: false, selected: false, message: '未指定标签页，跳过 Stripe PayPal 子框架选择' };
@@ -295,7 +423,7 @@ function selectStripePaypalFrame(): StripePaypalFrameSelectResult {
     const rect = element.getBoundingClientRect();
     const clientX = rect.left + Math.max(1, rect.width / 2);
     const clientY = rect.top + Math.max(1, rect.height / 2);
-    for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+    for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) {
       const EventCtor = type.startsWith('pointer') ? PointerEvent : MouseEvent;
       element.dispatchEvent(new EventCtor(type, {
         bubbles: true,

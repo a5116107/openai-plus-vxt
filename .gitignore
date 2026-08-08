@@ -17,6 +17,10 @@ web-ext.config.ts
 __pycache__/
 *.pyc
 
+# Local reference repositories and one-off migration helpers.
+.ref_upl/
+/_*.py
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

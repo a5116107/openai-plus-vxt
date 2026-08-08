@@ -41,10 +41,7 @@ export function isPaymentUrl(url: URL): boolean {
 }
 
 export function isOpenAiCheckoutUrl(url: URL): boolean {
-  return (
-    (url.hostname === 'pay.openai.com' && url.pathname.startsWith('/c/pay/cs_')) ||
-    (url.hostname === 'chatgpt.com' && url.pathname.startsWith('/checkout/openai_llc/cs_'))
-  );
+  return isCheckoutPageUrl(url);
 }
 
 export function isOAuthCallbackUrl(url: URL): boolean {
@@ -79,7 +76,7 @@ export function getFailedOpenAiPaymentRedirect(url: URL): string {
 }
 
 export function isChatGptPaymentSuccessUrl(url: URL): boolean {
-  return url.hostname === 'chatgpt.com' && url.pathname.startsWith('/payments/success');
+  return isCheckoutSuccessUrl(url);
 }
 
 export function isPaypalCheckoutFlowUrl(url: URL): boolean {
@@ -135,3 +132,4 @@ function normalizePathname(pathname: string): string {
 function isOpenAiLogInPath(pathname: string): boolean {
   return pathname === '/log-in' || pathname.startsWith('/log-in/');
 }
+import { isCheckoutPageUrl, isCheckoutSuccessUrl } from '../link-extractor/checkout-reference';

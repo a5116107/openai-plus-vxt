@@ -2,6 +2,7 @@ import { loadAutomationState } from '../../app/state';
 import { loadAddressAutofillSettings, saveAddressAutofillSettings } from '../settings/state';
 import type { AddressAutofillSettings } from '../settings/types';
 import type { AddressProfile, RandomAddressResponse } from './types';
+import { isCheckoutPageUrl, isLiveCheckoutPageUrl } from '../link-extractor/checkout-reference';
 
 const LOG_PREFIX = '[OPX Pay Autofill]';
 const PAYPAL_SELECTORS = [
@@ -172,6 +173,23 @@ interface PaymentSubmitResult {
   paymentError?: string;
 }
 
+export interface SavedCardSelectionResult {
+  ok: boolean;
+  message: string;
+  found: boolean;
+  selected: boolean;
+  last4: string;
+  availableLast4: string[];
+}
+
+export interface BillingVerificationResult {
+  ok: boolean;
+  message: string;
+  verified: boolean;
+  country: string;
+  matchedFields: number;
+}
+
 type CheckoutAmountRole = 'due' | 'plan' | 'unknown';
 
 interface CheckoutAmountCandidate {
@@ -241,6 +259,85 @@ export async function submitOpenAiCheckoutNow(address: AddressProfile): Promise<
   autoAutofillFinished = true;
   cancelScheduledAutofill();
   return fillPayOpenAiAddressNow(address, { force: true });
+}
+
+export async function selectSavedCardNow(expectedLast4: string): Promise<SavedCardSelectionResult> {
+  if (!isSupportedOpenAiCheckoutHost() || !/^\d{4}$/.test(expectedLast4)) {
+    return { ok: false, message: 'Saved Card 选择参数或页面无效', found: false, selected: false, last4: '', availableLast4: [] };
+  }
+  const candidates = findSavedCardCandidates();
+  const availableLast4 = [...new Set(candidates.map((item) => item.last4))];
+  const target = candidates.find((item) => item.last4 === expectedLast4);
+  if (!target) {
+    return { ok: false, message: 'SAVED_CARD_NOT_FOUND', found: false, selected: false, last4: '', availableLast4 };
+  }
+  if (!isPaymentChoiceSelected(target.element)) {
+    clickElement(target.element);
+    await delay(180);
+  }
+  const selected = findSavedCardCandidates().some((item) => item.last4 === expectedLast4 && isPaymentChoiceSelected(item.element));
+  return {
+    ok: selected,
+    message: selected ? `Saved Card •••• ${expectedLast4} 已选中` : `Saved Card •••• ${expectedLast4} 选中状态回读失败`,
+    found: true,
+    selected,
+    last4: selected ? expectedLast4 : '',
+    availableLast4,
+  };
+}
+
+export async function fillOpenAiBillingAddressNow(address: AddressProfile): Promise<PayOpenAiFillResult> {
+  if (!isSupportedOpenAiCheckoutHost() || !isLiveCheckoutSessionPage()) {
+    return { ok: false, filled: 0, message: '当前不是 OpenAI 订阅 checkout 页面' };
+  }
+  const filled = hasStripeAddressElementFrame() ? 0 : await fillCheckoutFields(address);
+  const present = checkoutContainsAddressValues(address);
+  if (filled > 0 || present) filledAddressKey = createAddressKey(address);
+  return {
+    ok: filled > 0 || present || hasStripeAddressElementFrame(),
+    filled,
+    submitted: false,
+    requiresSubmit: true,
+    message: filled > 0 ? `已填写 billing address ${filled} 项` : present ? 'billing address 已存在' : 'billing address 位于 Stripe 子框架',
+  };
+}
+
+export function verifyOpenAiBillingAddressNow(address: AddressProfile): BillingVerificationResult {
+  if (!isSupportedOpenAiCheckoutHost() || !isLiveCheckoutSessionPage()) {
+    return { ok: false, message: '当前不是 OpenAI 订阅 checkout 页面', verified: false, country: '', matchedFields: 0 };
+  }
+  const values = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'))
+    .filter(isTextControl)
+    .map((input) => normalizedText(input.value))
+    .filter(Boolean);
+  const expected = [address.fullName, address.line1, address.city, address.postalCode].map(normalizedText).filter(Boolean);
+  const matchedFields = expected.filter((value) => values.includes(value)).length;
+  const countryControl = document.querySelector<HTMLSelectElement>('#billingCountry, select[autocomplete="billing country"]');
+  const country = String(countryControl?.value || address.countryCode).trim().toUpperCase();
+  const verified = expected.length === 4 && matchedFields === expected.length && country === address.countryCode.toUpperCase();
+  return { ok: verified, verified, country, matchedFields, message: verified ? 'billing address 回读通过' : 'BILLING_VERIFY_FAILED' };
+}
+
+export async function submitQualifiedOpenAiCheckoutNow(input: {
+  expectedLast4: string;
+  billingCountry: string;
+  selectionVerified: boolean;
+  billingVerified: boolean;
+  submitKey: string;
+}): Promise<PayOpenAiFillResult> {
+  if (!input.selectionVerified || !input.billingVerified) {
+    return { ok: false, filled: 0, submitted: false, requiresSubmit: true, message: '提交前门未通过' };
+  }
+  const submit = await trySubmitZeroAmountCheckout(`closure:${input.submitKey}:${input.expectedLast4}:${input.billingCountry}`);
+  return {
+    ok: isPaymentSubmitComplete(submit),
+    filled: 0,
+    submitted: submit.submitted,
+    requiresSubmit: submit.requiresSubmit,
+    canRetry: submit.canRetry,
+    paymentError: submit.paymentError,
+    message: submit.message,
+  };
 }
 
 export function initPayOpenAiAddressAutofill(): void {
@@ -562,6 +659,45 @@ function normalizeJapanLookupKey(value: string): string {
     .replace(/[^a-z]/g, '');
 }
 
+function findSavedCardCandidates(): Array<{ element: HTMLElement; last4: string }> {
+  const elements = Array.from(document.querySelectorAll<HTMLElement>(
+    'button, label, [role="radio"], [role="tab"], [data-testid], [aria-label], input[type="radio"]',
+  )).filter(isVisible);
+  const results: Array<{ element: HTMLElement; last4: string }> = [];
+  for (const element of elements) {
+    const text = [
+      element.textContent,
+      element.getAttribute('aria-label'),
+      element.getAttribute('data-testid'),
+      element.getAttribute('value'),
+      element.getAttribute('name'),
+    ].join(' ');
+    const match = text.match(/(?:••••|\*{4}|ending(?:\s+in)?|last\s*4|尾号|末四位)?\s*(\d{4})(?!\d)/i);
+    if (!match) continue;
+    const context = normalizedText(text);
+    if (!/(?:saved|card|visa|mastercard|amex|discover|支付方式|银行卡|信用卡|借记卡|••••|\*{4})/.test(context)) continue;
+    const clickTarget = element.matches('input[type="radio"]')
+      ? element.closest<HTMLElement>('label, button, [role="radio"], [data-testid]') || element
+      : element;
+    if (!results.some((item) => item.element === clickTarget && item.last4 === match[1])) {
+      results.push({ element: clickTarget, last4: match[1] });
+    }
+  }
+  return results;
+}
+
+function isPaymentChoiceSelected(element: HTMLElement): boolean {
+  const input = element.matches('input') ? element as HTMLInputElement : element.querySelector<HTMLInputElement>('input[type="radio"], input[type="checkbox"]');
+  return Boolean(
+    input?.checked ||
+    element.getAttribute('aria-selected') === 'true' ||
+    element.getAttribute('aria-checked') === 'true' ||
+    element.getAttribute('data-selected') === 'true' ||
+    /(?:^|\s)(?:selected|checked|active)(?:\s|$)/i.test(element.className) ||
+    element.closest('[aria-selected="true"], [aria-checked="true"], [data-selected="true"], .selected, .Selected'),
+  );
+}
+
 async function ensurePaypalReadyForAutofill(): Promise<{ required: boolean; ready: boolean; canRetry: boolean; message: string }> {
   const paypalButton = findPaypalAccordionButton();
   if (!paypalButton) {
@@ -849,21 +985,28 @@ async function trySubmitZeroAmountCheckout(addressKey: string): Promise<PaymentS
     return { message: `当前应付金额不是 0（${amount.text}），未点击提交`, canRetry: false, submitted: false, requiresSubmit: true };
   }
 
-  const key = `${location.href}|${addressKey}|${amount.text}`;
-  if (zeroAmountSubmitKey === key) {
+  const key = `${location.href}|${amount.text}`;
+  const documentSubmitKey = document.documentElement.dataset.opxZeroSubmitKey || '';
+  if (zeroAmountSubmitKey === key || documentSubmitKey === key) {
     return { message: '0 元订单已点击过订阅，跳过重复点击', canRetry: false, submitted: true, requiresSubmit: true };
   }
+  zeroAmountSubmitKey = key;
+  document.documentElement.dataset.opxZeroSubmitKey = key;
 
   const submitButton = await waitForZeroAmountSubmitButton(10_000);
   if (!submitButton) {
+    zeroAmountSubmitKey = '';
+    if (document.documentElement.dataset.opxZeroSubmitKey === key) delete document.documentElement.dataset.opxZeroSubmitKey;
     return { message: `检测到 ${amount.text}，但提交按钮尚未完全可点击`, canRetry: true, submitted: false, requiresSubmit: true };
   }
 
-  zeroAmountSubmitKey = key;
   clickElement(submitButton);
   const paymentError = await waitForPaymentError(3500);
   if (paymentError) {
     zeroAmountSubmitKey = '';
+    if (document.documentElement.dataset.opxZeroSubmitKey === key) {
+      delete document.documentElement.dataset.opxZeroSubmitKey;
+    }
     return {
       message: `检测到 ${amount.text}，已点击提交，但支付页返回错误：${paymentError}`,
       canRetry: isRetryablePaymentError(paymentError),
@@ -886,10 +1029,7 @@ function isPaymentSubmitComplete(result: PaymentSubmitResult): boolean {
 }
 
 function isLiveCheckoutSessionPage(): boolean {
-  return (
-    (location.hostname === 'pay.openai.com' && location.pathname.startsWith('/c/pay/cs_live_')) ||
-    (location.hostname === 'chatgpt.com' && location.pathname.startsWith('/checkout/openai_llc/cs_live_'))
-  );
+  return isLiveCheckoutPageUrl(location.href);
 }
 
 function isSupportedOpenAiCheckoutHost(): boolean {
@@ -898,7 +1038,7 @@ function isSupportedOpenAiCheckoutHost(): boolean {
 }
 
 function isChatGptCheckoutPage(): boolean {
-  return location.hostname === 'chatgpt.com' && location.pathname.startsWith('/checkout/openai_llc/cs_');
+  return location.hostname === 'chatgpt.com' && isCheckoutPageUrl(location.href);
 }
 
 function currentPaymentPageData(pageKind: string): Record<string, unknown> {
@@ -1359,24 +1499,6 @@ function emitChange(element: HTMLElement): void {
 
 function clickElement(element: HTMLElement): void {
   element.scrollIntoView({ block: 'center', inline: 'center' });
-  const rect = element.getBoundingClientRect();
-  const clientX = rect.left + Math.max(1, rect.width / 2);
-  const clientY = rect.top + Math.max(1, rect.height / 2);
-  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
-    const EventCtor = type.startsWith('pointer') ? PointerEvent : MouseEvent;
-    element.dispatchEvent(new EventCtor(type, {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      button: 0,
-      buttons: type.endsWith('down') ? 1 : 0,
-      clientX,
-      clientY,
-      pointerId: 1,
-      pointerType: 'mouse',
-      view: window,
-    }));
-  }
   element.click();
 }
 

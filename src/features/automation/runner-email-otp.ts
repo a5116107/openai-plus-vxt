@@ -18,6 +18,10 @@ import {
   isAfterEmailVerificationUrl,
   isEmailVerificationUrl,
 } from './runner-url';
+import type {
+  AuthNetworkObservation,
+  AuthNetworkResultResponse,
+} from './auth-network-observer';
 
 const EMAIL_OTP_ATTEMPTS = 5;
 
@@ -33,8 +37,10 @@ export async function waitOutlookCodeStep(context: EmailOtpStepContext): Promise
   if (!email) {
     return { ok: false, message: '没有当前邮箱，请先执行“选择邮箱”' };
   }
-  if (!email.rawInput.includes('----')) {
-    return { ok: false, message: '当前邮箱不是 Outlook 行，无法自动接收邮箱验证码' };
+  // plain email is OK when Acica auto OTP is enabled; token line still supported
+  const hasTokenLine = email.rawInput.includes('----') || /---/.test(email.rawInput);
+  if (!email.email && !hasTokenLine) {
+    return { ok: false, message: '当前邮箱无效，无法自动接收邮箱验证码' };
   }
 
   const tabId = await context.automationTargetTabId();
@@ -53,6 +59,7 @@ export async function waitOutlookCodeStep(context: EmailOtpStepContext): Promise
   let since = Date.now() - 10_000;
   const ignoredCodes: string[] = [];
   let lastResult: ActionResult = { ok: false, message: '尚未接收邮箱验证码' };
+  const otpWaitSeconds = Math.max(20, Math.min(180, Number(state.settings.acicaMailbox?.otpWaitSeconds || 90) || 90));
 
   for (let attempt = 1; attempt <= EMAIL_OTP_ATTEMPTS; attempt += 1) {
     if (context.isStopRequested()) {
@@ -61,7 +68,7 @@ export async function waitOutlookCodeStep(context: EmailOtpStepContext): Promise
 
     const result = await waitForOutlookOtpAndSubmit({
       since,
-      timeoutMs: 180_000,
+      timeoutMs: otpWaitSeconds * 1000,
       intervalMs: 5_000,
       tabId,
       ignoreCodes: ignoredCodes,
@@ -146,6 +153,7 @@ async function waitForEmailVerificationSubmitProgress(
   context: Pick<EmailOtpStepContext, 'isStopRequested'>,
 ): Promise<ActionResult> {
   const deadline = Date.now() + timeoutMs;
+  const networkSince = Date.now() - 15_000;
   let lastUrl = '';
   while (Date.now() <= deadline) {
     if (context.isStopRequested()) {
@@ -162,6 +170,11 @@ async function waitForEmailVerificationSubmitProgress(
       };
     }
 
+    const networkObservation = await readAuthNetworkObservation(tabId, networkSince);
+    if (networkObservation?.cloudflareChallenge) {
+      return authCloudflareChallengeResult(networkObservation, lastUrl);
+    }
+
     const accountStatus = await detectAuthAccountUnavailable(tabId);
     if (isOpenAiAuthAccountUnavailableFailure('wait-register-email-code', accountStatus)) {
       return accountStatus;
@@ -172,11 +185,62 @@ async function waitForEmailVerificationSubmitProgress(
     }
     await delay(500);
   }
+  const networkObservation = await readAuthNetworkObservation(tabId, networkSince);
+  if (networkObservation?.cloudflareChallenge) {
+    return authCloudflareChallengeResult(networkObservation, lastUrl);
+  }
   return {
-    ok: true,
+    ok: false,
     message: `验证码已提交，等待后续页面超时，最后页面：${shortUrl(lastUrl) || '未知'}`,
     data: { url: lastUrl, submitProgressTimeout: true },
   };
+}
+
+export function authCloudflareChallengeResult(
+  observation: AuthNetworkObservation,
+  pageUrl = '',
+): ActionResult {
+  const endpoint = authEndpointLabel(observation.url);
+  return {
+    ok: false,
+    code: 'AUTH_CF_CHALLENGE',
+    message: `Auth ${endpoint} 被 Cloudflare challenge 截止（HTTP ${observation.status}）`,
+    data: {
+      url: pageUrl || observation.url,
+      authCloudflareChallenge: true,
+      httpStatus: observation.status,
+      contentType: observation.contentType,
+      cfRay: observation.cfRay,
+      observedAt: observation.observedAt,
+      authEndpoint: endpoint,
+      retryWithFreshAuthExit: true,
+    },
+  };
+}
+
+export async function readAuthNetworkObservation(tabId: number, since: number): Promise<AuthNetworkObservation | null> {
+  try {
+    const response = await browser.runtime.sendMessage({
+      type: 'opx:get-auth-network-result',
+      tabId,
+      since,
+    }) as AuthNetworkResultResponse;
+    return response?.observation || null;
+  } catch {
+    return null;
+  }
+}
+
+function authEndpointLabel(rawUrl: string): string {
+  try {
+    const path = new URL(rawUrl).pathname;
+    if (path.endsWith('/email-otp/validate')) return 'OTP validate';
+    if (path.endsWith('/email-otp/send')) return 'OTP send';
+    if (path.endsWith('/create_account')) return 'create account';
+    return path;
+  } catch {
+    return 'request';
+  }
 }
 
 async function detectEmailOtpIncorrect(tabId: number): Promise<ActionResult> {

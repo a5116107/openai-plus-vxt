@@ -66,6 +66,7 @@ export interface OutlookOtpResponse {
   message: string;
   code?: string;
   canceled?: boolean;
+  failureKind?: 'mail_not_arrived' | 'otp_not_found' | 'provider_error' | 'configuration_error' | 'stopped';
 }
 
 export interface OutlookOtpCancelMessage {

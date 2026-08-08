@@ -2,9 +2,13 @@ import { canUseExtensionApi } from '../src/app/extension-context';
 import {
   PAGE_ACTION,
   isFillCurrentPaymentAddressAction,
+  isOpenAiFillBillingAction,
+  isOpenAiSelectSavedCardAction,
   isOAuthFillPhoneAction,
   isOAuthFillPhoneCodeAction,
+  isOpenAiSubmitQualifiedCheckoutAction,
   isOpenAiSubmitCheckoutAction,
+  isOpenAiVerifyBillingAction,
   isRegisterFillPhoneAction,
 } from '../src/app/page-actions';
 import { initPayOpenAiAddressAutofill } from '../src/features/address-autofill/pay-openai-autofill';
@@ -18,10 +22,15 @@ import {
 } from '../src/features/register/chatgpt-phone-register-page';
 import type { ActionResult } from '../src/app/types';
 import type { AddressProfile } from '../src/features/address-autofill/types';
+import { isCheckoutPageUrl } from '../src/features/link-extractor/checkout-reference';
 import {
   checkPayOpenAiCheckoutReady,
+  fillOpenAiBillingAddressNow,
   fillPayOpenAiAddressNow,
+  selectSavedCardNow,
+  submitQualifiedOpenAiCheckoutNow,
   submitOpenAiCheckoutNow,
+  verifyOpenAiBillingAddressNow,
 } from '../src/features/address-autofill/pay-openai-autofill';
 import {
   checkPaypalCheckoutReady,
@@ -41,6 +50,10 @@ import {
   inspectOAuthPhonePageState,
   initOAuthPhoneCountrySearch,
 } from '../src/features/oauth/openai-phone-page';
+import {
+  isSavedPaymentStartMessage,
+  runSavedCardSetupInPage,
+} from '../src/features/saved-payment-methods/content-driver';
 
 const CONTENT_AUTOFILL_LOADED_KEY = '__opx_assistant_content_autofill_loaded__';
 const CONTENT_ACTION_BRIDGE_KEY = '__opx_assistant_action_bridge_installed__';
@@ -57,7 +70,7 @@ export default defineContentScript({
     'http://127.0.0.1:1455/*',
   ],
   runAt: 'document_idle',
-  registration: 'runtime',
+  registration: 'manifest',
   main() {
     if (!canUseExtensionApi()) {
       return;
@@ -104,6 +117,9 @@ function installContentActionBridge(): void {
 }
 
 async function handleContentActionMessage(message: Record<string, unknown>): Promise<ActionResult | undefined> {
+  if (isSavedPaymentStartMessage(message)) {
+    return runSavedCardSetupInPage(message);
+  }
   if (message.type === PAGE_ACTION.registerFillEmail) {
     return createRegisterController().fillEmailFromInput();
   }
@@ -136,6 +152,18 @@ async function handleContentActionMessage(message: Record<string, unknown>): Pro
   }
   if (isOpenAiSubmitCheckoutAction(message)) {
     return submitOpenAiCheckoutNow(message.address);
+  }
+  if (isOpenAiSelectSavedCardAction(message)) {
+    return selectSavedCardNow(message.expectedLast4);
+  }
+  if (isOpenAiFillBillingAction(message)) {
+    return fillOpenAiBillingAddressNow(message.address);
+  }
+  if (isOpenAiVerifyBillingAction(message)) {
+    return verifyOpenAiBillingAddressNow(message.address);
+  }
+  if (isOpenAiSubmitQualifiedCheckoutAction(message)) {
+    return submitQualifiedOpenAiCheckoutNow(message);
   }
   if (message.type === PAGE_ACTION.paypalOpenAccount) {
     return openPaypalAccountEntryNow();
@@ -187,8 +215,7 @@ async function fillCurrentPaymentAddress(address: AddressProfile): Promise<Actio
 }
 
 function isOpenAiCheckoutPage(): boolean {
-  return location.hostname === 'pay.openai.com' ||
-    (location.hostname === 'chatgpt.com' && location.pathname.startsWith('/checkout/openai_llc/cs_'));
+  return isCheckoutPageUrl(location.href);
 }
 
 function checkPaymentReady(kind: string): ActionResult {

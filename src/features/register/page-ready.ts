@@ -126,6 +126,25 @@ function checkProfileReady(): ActionResult {
   if (location.hostname !== 'auth.openai.com' || !location.pathname.startsWith('/about-you')) {
     return fail('当前页面不是资料填写页');
   }
+  const createRequestFailure = findProfileCreateRequestFailure();
+  if (createRequestFailure) {
+    return fail('资料页创建请求返回 HTTP ' + createRequestFailure.status, {
+      profileCreateRejected: true,
+      profileCreateHttpStatus: createRequestFailure.status,
+      profileCreateRequestUrl: createRequestFailure.url,
+      url: location.href,
+      readyState: document.readyState,
+    });
+  }
+  const registrationDisallowed = findRegistrationDisallowedError();
+  if (registrationDisallowed) {
+    return fail(`资料页拒绝创建：${registrationDisallowed}`, {
+      registrationDisallowed: true,
+      errorText: registrationDisallowed,
+      url: location.href,
+      readyState: document.readyState,
+    });
+  }
   const retryableError = findRetryableAboutYouError();
   if (retryableError) {
     return fail(`资料页错误：${retryableError}`, {
@@ -161,6 +180,38 @@ function checkProfileReady(): ActionResult {
     formMode === 'birthday' ? '资料填写表单已就绪（生日格式）' : '资料填写表单已就绪（年龄格式）',
     { profileFormMode: formMode },
   );
+}
+
+function findProfileCreateRequestFailure(): { status: number; url: string } | null {
+  const entries = performance.getEntriesByType('resource') as Array<PerformanceResourceTiming & {
+    responseStatus?: number;
+  }>;
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    if (!entry.name.includes('/api/accounts/create_account')) {
+      continue;
+    }
+    const status = Number(entry.responseStatus || 0);
+    if (status >= 400) {
+      return { status, url: entry.name };
+    }
+  }
+  return null;
+}
+
+function findRegistrationDisallowedError(): string {
+  const alert = textOf('[role="alert"], [data-testid="error-subtitle"], [class*="error"]');
+  const body = normalizedText(document.body?.innerText || document.body?.textContent || '');
+  const combined = normalizedText(`${alert} ${body}`);
+  if (
+    combined.includes('registration_disallowed') ||
+    combined.includes('sorry, we cannot create your account with the given information') ||
+    combined.includes('无法创建你的账户') ||
+    combined.includes('无法创建您的账户')
+  ) {
+    return compactText(alert) || 'registration_disallowed';
+  }
+  return '';
 }
 
 function detectProfileFormMode(): ProfileFormMode {

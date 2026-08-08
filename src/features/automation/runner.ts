@@ -1,3 +1,4 @@
+import { DEFAULT_ACICA_MAILBOX_SETTINGS, normalizeAcicaMailboxSettings } from '../mailbox/acica';
 import { getBrowserTab, type BrowserTabInfo } from '../../app/active-tab';
 import {
   loadAutomationState,
@@ -47,6 +48,13 @@ import type {
   AutomationState,
   AutomationStepId,
 } from './types';
+import { runPlusCheckoutClosureInBrowser } from './plus-checkout-closure-runner';
+
+import {
+  automationStageForAutomationStep,
+  automationStageLabel,
+} from '../proxy/service';
+import type { AutomationProxyStage, ProxyRuntimeStatus } from '../proxy/types';
 import {
   actionDataStatus,
   debugPayloadText,
@@ -60,6 +68,7 @@ import {
 } from './runner-format';
 import {
   accountUnavailableFailureLabel,
+  isAuthCloudflareChallengeResult,
   isPaymentProfileComplete,
   isPhoneNumberRejectedFailure,
   isRetryableOpenAiCheckoutAddressFailure,
@@ -86,10 +95,12 @@ import {
   hasNextBatchEmail,
   markSelectedEmailError,
   markSelectedEmailUsed,
+  recordSelectedEmailMessage,
   markSelectedSmsDisabled,
   normalizeBatchAccountLimit,
   selectEmail,
   selectSmsTarget,
+  writeRegisterStateFromEmail,
 } from './runner-state';
 import {
   resolveAutomationStartStep,
@@ -97,6 +108,8 @@ import {
   stepTitle,
 } from './runner-progress';
 import {
+  authCloudflareChallengeResult,
+  readAuthNetworkObservation,
   waitOutlookCodeStep as waitOutlookCodeStepModule,
 } from './runner-email-otp';
 import {
@@ -115,6 +128,7 @@ import {
   requestFoxSmsSpecifiedNumber,
 } from './fox-sms';
 import {
+  captureAutomationCheckoutQualification,
   createCheckoutLinkStep as createCheckoutLinkStepModule,
   openCheckoutLinkStep as openCheckoutLinkStepModule,
   readSessionStep as readSessionStepModule,
@@ -133,7 +147,10 @@ const PAYMENT_PAGE_LOAD_TIMEOUT_MS = 45_000;
 const PAYMENT_PROFILE_ATTEMPTS = 5;
 const PAYMENT_PROFILE_RETRY_DELAY_MS = 3_000;
 const PAYPAL_STEP_TIMEOUT_MS = 90_000;
+const EMAIL_REGISTRATION_ATTEMPTS = 3;
+const REGISTER_PAGE_RETRY_ATTEMPTS = 3;
 const AUTOMATION_START_STEP: AutomationStepId = 'cleanup-environment';
+const EMAIL_RETRY_START_STEP: AutomationStepId = 'select-email';
 const PAYMENT_STAGE_START_STEP: AutomationStepId = 'read-chatgpt-session';
 const PAYMENT_PROFILE_STEP: AutomationStepId = 'fill-payment-profile';
 const REGISTER_PHONE_RETRY_START_STEP: AutomationStepId = 'open-register';
@@ -155,6 +172,9 @@ const CLEAR_REGISTER_PHONE_RUN: Partial<AutomationRunState> = {
 
 let autoRunActive = false;
 let stopRequested = false;
+let automationProxyCycleId = '';
+let lastAutomationProxyStage: AutomationProxyStage | null = null;
+const rejectedAuthExitIps = new Set<string>();
 let stopSignalId = 0;
 const stopWaiters = new Set<(result: ActionResult) => void>();
 
@@ -265,6 +285,9 @@ export async function runAutomationStep(stepId: AutomationStepId): Promise<Actio
     return stoppedResult();
   }
   if (!wasAutoRunning) {
+    automationProxyCycleId = createAutomationProxyCycleId();
+    lastAutomationProxyStage = null;
+    rejectedAuthExitIps.clear();
     await setAutomationRunning(true, false);
   }
   await markAutomationStep(stepId, 'running', '执行中');
@@ -273,7 +296,10 @@ export async function runAutomationStep(stepId: AutomationStepId): Promise<Actio
   const startedAt = Date.now();
   await appendAutomationDebugLog(stepId, 'step-start', { wasAutoRunning });
   try {
-    const result = await runInterruptibleStep(stepId);
+    let result = await runInterruptibleStep(stepId);
+    if (!result.ok && automationStageForAutomationStep(stepId) === 'auth') {
+      result = await classifyRecentAuthCloudflareFailure(stepId, result, startedAt);
+    }
     await appendAutomationDebugLog(stepId, 'step-result', {
       ok: result.ok,
       elapsedMs: Date.now() - startedAt,
@@ -286,7 +312,7 @@ export async function runAutomationStep(stepId: AutomationStepId): Promise<Actio
       return result;
     }
     if (!wasAutoRunning && !result.ok) {
-      const accountUnavailable = await handleAccountUnavailableResult(stepId, result);
+      const accountUnavailable = await handleAccountUnavailableResult(stepId, result, 1);
       if (accountUnavailable) {
         await setAutomationRunning(false, accountUnavailable.paused);
         return accountUnavailable.result;
@@ -320,7 +346,7 @@ export async function runAutomationStep(stepId: AutomationStepId): Promise<Actio
       await appendAutomationLog('success', result.message, stepId);
       if (!wasAutoRunning) {
         const state = await loadAutomationState();
-        await updateAutomationRun({ currentStepId: nextVisibleAutomationStepId(stepId, state.settings.oauthExtractMode, state.settings.registrationMode) });
+        await updateAutomationRun({ currentStepId: nextVisibleAutomationStepId(stepId, state.settings.oauthExtractMode, state.settings.registrationMode, state.settings.plusCheckoutClosure.enabled) });
       }
     } else {
       await markAutomationStep(stepId, 'error', result.message);
@@ -484,6 +510,9 @@ export async function runAutomationFrom(stepId?: AutomationStepId): Promise<Acti
 
   try {
     while (currentId && completedAccounts < batchLimit) {
+      automationProxyCycleId = createAutomationProxyCycleId();
+      lastAutomationProxyStage = null;
+      rejectedAuthExitIps.clear();
       const result = await runAutomationFlow(currentId);
       if (!result.ok || !result.completed) {
         return { ok: result.ok, message: result.message, code: result.code, url: result.url, data: result.data };
@@ -559,6 +588,9 @@ interface AutomationFlowResult extends ActionResult {
 
 async function runAutomationFlow(startStepId: AutomationStepId): Promise<AutomationFlowResult> {
   let currentId: AutomationStepId | '' = startStepId;
+  let emailRegistrationAttempts = 1;
+  let registerPageAttempts = 1;
+  let authChallengeAttempts = 1;
   while (currentId) {
     if (stopRequested) {
       await setAutomationRunning(false, true);
@@ -572,6 +604,14 @@ async function runAutomationFlow(startStepId: AutomationStepId): Promise<Automat
       return { ...result, ok: false, completed: false, message: result.message || '自动执行已暂停' };
     }
     const latest = await loadAutomationState();
+    if (result.ok && isQualificationCapturedResult(result)) {
+      const message = `${result.message}；当前账号资格采集完成，跳过后续支付步骤`;
+      if (latest.settings.registrationMode !== 'phone') {
+        await markSelectedEmailUsed(message);
+      }
+      await appendAutomationLog('success', message, currentId);
+      return { ...result, completed: true, message };
+    }
     if (!result.ok && isRegisterPhoneSmsTimeoutResult(currentId, result, latest)) {
       currentId = await restartRegisterPhoneAfterSmsTimeout(result);
       await setAutomationRunning(true, false);
@@ -602,12 +642,53 @@ async function runAutomationFlow(startStepId: AutomationStepId): Promise<Automat
       await setAutomationRunning(true, false);
       continue;
     }
-    const accountUnavailable = !result.ok ? await handleAccountUnavailableResult(currentId, result) : null;
+    if (!result.ok && isAuthCloudflareChallengeResult(result)) {
+      const retryStep = await retryAuthAfterCloudflareChallenge(result, authChallengeAttempts);
+      if (retryStep) {
+        authChallengeAttempts += 1;
+        currentId = retryStep;
+        await setAutomationRunning(true, false);
+        continue;
+      }
+      await recordSelectedEmailMessage(result.message);
+      await setAutomationRunning(false, true);
+      return { ...result, completed: false };
+    }
+    if (!result.ok && result.code === 'AUTH_EXIT_NOT_ROTATED') {
+      await recordSelectedEmailMessage(result.message);
+      await appendAutomationLog('error', result.message, currentId);
+      await setAutomationRunning(false, true);
+      return { ...result, completed: false };
+    }
+    if (!result.ok && isRetryableRegisterPageFailure(currentId, result, latest)) {
+      const retryStep = await retryRegisterPageWithFreshProxy(result, registerPageAttempts);
+      if (retryStep) {
+        registerPageAttempts += 1;
+        currentId = retryStep;
+        await setAutomationRunning(true, false);
+        continue;
+      }
+    }
+    if (!result.ok && isRetryableMailboxFailure(currentId, result, latest)) {
+      const retryStep = await rotateMailboxAfterFailure(currentId, result, emailRegistrationAttempts);
+      if (retryStep) {
+        emailRegistrationAttempts += 1;
+        registerPageAttempts = 1;
+        currentId = retryStep;
+        await setAutomationRunning(true, false);
+        continue;
+      }
+    }
+    const accountUnavailable = !result.ok
+      ? await handleAccountUnavailableResult(currentId, result, emailRegistrationAttempts)
+      : null;
     if (accountUnavailable) {
       if (accountUnavailable.paused) {
         await setAutomationRunning(false, true);
         return { ...accountUnavailable.result, completed: false };
       }
+      emailRegistrationAttempts += 1;
+      registerPageAttempts = 1;
       await setAutomationRunning(true, false);
       currentId = AUTOMATION_START_STEP;
       continue;
@@ -621,10 +702,14 @@ async function runAutomationFlow(startStepId: AutomationStepId): Promise<Automat
         continue;
       }
       await setAutomationRunning(false, false);
-      await markSelectedEmailError(result.message);
+      if (isTransientMailboxOtpFailure(result)) {
+        await recordSelectedEmailMessage(result.message);
+      } else {
+        await markSelectedEmailError(result.message);
+      }
       return { ...result, completed: false };
     }
-    currentId = nextVisibleAutomationStepId(currentId, latest.settings.oauthExtractMode, latest.settings.registrationMode);
+    currentId = nextVisibleAutomationStepId(currentId, latest.settings.oauthExtractMode, latest.settings.registrationMode, latest.settings.plusCheckoutClosure.enabled);
     await updateAutomationRun({ currentStepId: currentId });
   }
 
@@ -635,9 +720,199 @@ async function runAutomationFlow(startStepId: AutomationStepId): Promise<Automat
   return { ok: true, completed: true, message: '当前账号自动执行完成' };
 }
 
+async function classifyRecentAuthCloudflareFailure(
+  stepId: AutomationStepId,
+  original: ActionResult,
+  since: number,
+): Promise<ActionResult> {
+  const target = await getAutomationTargetTab().catch(() => null);
+  if (typeof target?.id !== 'number') return original;
+  const observation = await readAuthNetworkObservation(target.id, since);
+  if (!observation?.cloudflareChallenge) return original;
+  const challenge = authCloudflareChallengeResult(observation, target.url || '');
+  return {
+    ...challenge,
+    message: `${challenge.message}；步骤 ${stepId} 原始结果：${original.message}`,
+    data: {
+      ...(isRecord(challenge.data) ? challenge.data : {}),
+      originalMessage: original.message,
+      originalCode: original.code || '',
+    },
+  };
+}
+
+async function retryAuthAfterCloudflareChallenge(
+  result: ActionResult,
+  currentAttempt: number,
+): Promise<AutomationStepId | null> {
+  const status = await readProxyRuntimeStatus();
+  const failedEvidence = status?.settings?.automationRouting?.evidence?.auth;
+  const failedIp = String(failedEvidence?.ip || '').trim().toLowerCase();
+  if (failedIp) rejectedAuthExitIps.add(failedIp);
+
+  if (currentAttempt >= REGISTER_PAGE_RETRY_ATTEMPTS) {
+    await appendAutomationLog(
+      'error',
+      `Auth Cloudflare 403 恢复已达到 ${REGISTER_PAGE_RETRY_ATTEMPTS} 次；失败出口：${[...rejectedAuthExitIps].join(', ') || '未探测到 IP'}；${result.message}`,
+      'wait-register-email-code',
+    );
+    return null;
+  }
+
+  const cleanup = await triggerAutomationCookieCleanupOnly(['chatgpt']);
+  await clearAutomationTargetTab();
+  await resetAutomationFromStep('open-register');
+  automationProxyCycleId = createAutomationProxyCycleId();
+  lastAutomationProxyStage = null;
+  await appendAutomationLog(
+    'warn',
+    `Auth OTP validate 遇到 Cloudflare 403，保留当前邮箱；${cleanup.ok ? '已清理 Auth Cookie' : '已尝试清理 Auth Cookie'}；拒绝旧出口 ${failedIp || '未知'}，正在获取不同 Auth IP ${currentAttempt + 1}/${REGISTER_PAGE_RETRY_ATTEMPTS}`,
+    'open-register',
+  );
+  return 'open-register';
+}
+
+async function readProxyRuntimeStatus(): Promise<ProxyRuntimeStatus | null> {
+  try {
+    return await browser.runtime.sendMessage({ type: 'opx:proxy-status' }) as ProxyRuntimeStatus;
+  } catch {
+    return null;
+  }
+}
+
+function isRetryableRegisterPageFailure(
+  stepId: AutomationStepId,
+  result: ActionResult,
+  state: AutomationState,
+): boolean {
+  if (state.settings.registrationMode === 'phone' || stepId !== 'fill-register-email') {
+    return false;
+  }
+  const message = String(result.message || '').toLowerCase();
+  return (isRecord(result.data) && result.data.emailSubmitProgressTimeout === true) ||
+    message.includes('没有跳转到邮箱验证码页') ||
+    message.includes('邮箱输入框还没有渲染完成') ||
+    message.includes('等待页面控件渲染超时') ||
+    message.includes('页面操作响应超时') ||
+    message.includes('err_connection_closed') ||
+    message.includes('failed to fetch');
+}
+
+async function retryRegisterPageWithFreshProxy(
+  result: ActionResult,
+  currentAttempt: number,
+): Promise<AutomationStepId | null> {
+  if (currentAttempt >= REGISTER_PAGE_RETRY_ATTEMPTS) {
+    await appendAutomationLog(
+      'error',
+      `注册页出口轮换已达到 ${REGISTER_PAGE_RETRY_ATTEMPTS} 次，本轮停止：${result.message}`,
+      'fill-register-email',
+    );
+    return null;
+  }
+
+  const cleanup = await triggerAutomationCookieCleanupOnly(['chatgpt']);
+  await clearAutomationTargetTab();
+  await resetAutomationFromStep('open-register');
+  automationProxyCycleId = createAutomationProxyCycleId();
+  lastAutomationProxyStage = null;
+  await appendAutomationLog(
+    'warn',
+    `注册页未推进，已保留当前邮箱并${cleanup.ok ? '清理 Cookie' : '尝试清理 Cookie'}，正在轮换 Auth 出口重试 ${currentAttempt + 1}/${REGISTER_PAGE_RETRY_ATTEMPTS}`,
+    'open-register',
+  );
+  return 'open-register';
+}
+
+function isRetryableMailboxFailure(
+  stepId: AutomationStepId,
+  result: ActionResult,
+  state: AutomationState,
+): boolean {
+  if (state.settings.registrationMode === 'phone') {
+    return false;
+  }
+  if (stepId === 'fill-register-email') {
+    const message = String(result.message || '').toLowerCase();
+    return (isRecord(result.data) && result.data.emailSubmitProgressTimeout === true) ||
+      message.includes('没有跳转到邮箱验证码页');
+  }
+  if (stepId !== 'wait-register-email-code') {
+    return false;
+  }
+  if (isRecord(result.data) && result.data.submitProgressTimeout === true) {
+    return true;
+  }
+  const message = String(result.message || '').toLowerCase();
+  return message.includes('acica otp 等待超时') ||
+    message.includes('acica otp 请求失败') ||
+    message.includes('等待邮箱验证码超时') ||
+    message.includes('没有找到验证码');
+}
+
+async function rotateMailboxAfterFailure(
+  stepId: AutomationStepId,
+  result: ActionResult,
+  currentAttempt: number,
+): Promise<AutomationStepId | null> {
+  const retryReason = stepId === 'fill-register-email'
+    ? '注册邮箱提交未推进'
+    : isRecord(result.data) && result.data.submitProgressTimeout === true
+      ? '邮箱验证码提交未推进'
+      : '邮箱取件失败';
+  const transientOtpFailure = isTransientMailboxOtpFailure(result);
+  if (transientOtpFailure) {
+    await recordSelectedEmailMessage(result.message);
+  } else {
+    await markSelectedEmailError(result.message);
+  }
+  if (currentAttempt >= EMAIL_REGISTRATION_ATTEMPTS) {
+    await appendAutomationLog(
+      'error',
+      `邮箱自动轮换已达到 ${EMAIL_REGISTRATION_ATTEMPTS} 次，本轮停止：${result.message}`,
+      stepId,
+    );
+    return null;
+  }
+
+  const cleanup = await triggerAutomationCookieCleanupOnly(['chatgpt']);
+  const latest = await loadAutomationState();
+  if (!hasNextBatchEmail(latest)) {
+    await appendAutomationLog('error', `当前邮箱失败且邮箱池已无可用项：${result.message}`, stepId);
+    return null;
+  }
+
+  await resetAutomationProgress();
+  await clearAutomationTargetTab();
+
+  automationProxyCycleId = createAutomationProxyCycleId();
+  lastAutomationProxyStage = null;
+  await updateAutomationRun({
+    currentStepId: EMAIL_RETRY_START_STEP,
+    selectedEmailId: '',
+    selectedSmsId: '',
+    checkoutUrl: '',
+    sessionEmail: '',
+  });
+  await appendAutomationLog(
+    'warn',
+    `${retryReason}，${transientOtpFailure ? '当前邮箱仅记录为暂时取件异常' : '已标记当前邮箱失败'}并${cleanup.ok ? '清理 Cookie' : '尝试清理 Cookie'}，正在随机切换邮箱重试 ${currentAttempt + 1}/${EMAIL_REGISTRATION_ATTEMPTS}`,
+    EMAIL_RETRY_START_STEP,
+  );
+  return EMAIL_RETRY_START_STEP;
+}
+
+function isTransientMailboxOtpFailure(result: ActionResult): boolean {
+  if (!isRecord(result.data)) return false;
+  return result.data.mailboxOtpFailure === 'mail_not_arrived' ||
+    result.data.mailboxOtpFailure === 'otp_not_found' ||
+    result.data.mailboxOtpFailure === 'provider_error';
+}
+
 async function handleAccountUnavailableResult(
   stepId: AutomationStepId,
   result: ActionResult,
+  currentAttempt: number,
 ): Promise<{ result: ActionResult; paused: boolean } | null> {
   const accountUnavailableLabel = accountUnavailableFailureLabel(stepId, result);
   if (!accountUnavailableLabel) {
@@ -676,7 +951,17 @@ async function handleAccountUnavailableResult(
       paused: true,
     };
   }
+  if (currentAttempt >= EMAIL_REGISTRATION_ATTEMPTS) {
+    const message = `${accountUnavailableLabel}，邮箱自动轮换已达到 ${EMAIL_REGISTRATION_ATTEMPTS} 次，任务已暂停：${result.message}`;
+    await appendAutomationLog('error', message, stepId);
+    return {
+      result: { ...result, ok: false, message },
+      paused: true,
+    };
+  }
 
+  automationProxyCycleId = createAutomationProxyCycleId();
+  lastAutomationProxyStage = null;
   await updateAutomationRun({
     currentStepId: AUTOMATION_START_STEP,
     selectedEmailId: '',
@@ -685,7 +970,7 @@ async function handleAccountUnavailableResult(
     checkoutUrl: '',
     sessionEmail: '',
   });
-  await appendAutomationLog('info', '已切换到下一个邮箱，重新从第 1 步开始', AUTOMATION_START_STEP);
+  await appendAutomationLog('info', `已切换到下一个邮箱，重新从第 1 步开始 ${currentAttempt + 1}/${EMAIL_REGISTRATION_ATTEMPTS}`, AUTOMATION_START_STEP);
   return {
     result: {
       ...result,
@@ -819,6 +1104,7 @@ function emailOtpStepContext() {
 
 function checkoutStepContext() {
   return {
+    automationTargetTabId,
     bindAutomationTargetTab,
     waitForAutomationTabUrl,
     waitForAutomationTabComplete,
@@ -870,7 +1156,64 @@ function paymentSmsStepContext() {
   };
 }
 
+
+async function ensureProxyStageForStep(stepId: AutomationStepId): Promise<ActionResult | null> {
+  const stage = automationStageForAutomationStep(stepId);
+  if (!stage) {
+    return null;
+  }
+  try {
+    const forceRotate = lastAutomationProxyStage !== stage;
+    const status = await browser.runtime.sendMessage({
+      type: 'opx:proxy-automation-stage',
+      stage,
+      cycleId: automationProxyCycleId || createAutomationProxyCycleId(),
+      forceRotate,
+      excludeIps: stage === 'auth' ? [...rejectedAuthExitIps] : [],
+      requireDifferentIp: stage === 'auth' && rejectedAuthExitIps.size > 0,
+      reason: stage === 'auth' && rejectedAuthExitIps.size > 0 ? 'auth-cloudflare-challenge' : '',
+    }) as ProxyRuntimeStatus;
+    if (!status) {
+      const message = `代理切换无响应：${automationStageLabel(stage)}`;
+      await appendAutomationLog('error', message, stepId);
+      return { ok: false, message };
+    }
+    if (!status.settings?.enabled) {
+      return null;
+    }
+    if (status.ok === false) {
+      const message = `代理切换失败：${status.message || automationStageLabel(stage)}`;
+      await appendAutomationLog('error', message, stepId);
+      return {
+        ok: false,
+        code: status.code,
+        message,
+        data: {
+          authExitNotRotated: status.code === 'AUTH_EXIT_NOT_ROTATED',
+          rejectedIps: stage === 'auth' ? [...rejectedAuthExitIps] : [],
+          evidence: status.applied?.evidence,
+        },
+      };
+    }
+    lastAutomationProxyStage = stage;
+    const evidence = status.applied?.evidence;
+    const exit = evidence?.verified ? `${evidence.country || '--'} ${evidence.ip}` : status.applied?.summary;
+    await appendAutomationLog('info', `代理阶段 → ${automationStageLabel(stage)}：${exit || status.message}`, stepId);
+    return null;
+  } catch (error) {
+    const message = `代理切换异常：${error instanceof Error ? error.message : String(error)}`;
+    await appendAutomationLog('error', message, stepId);
+    return { ok: false, message };
+  }
+}
+
+function createAutomationProxyCycleId(): string {
+  return `cycle-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 async function executeStep(stepId: AutomationStepId): Promise<ActionResult> {
+  const proxyFailure = await ensureProxyStageForStep(stepId);
+  if (proxyFailure) return proxyFailure;
   switch (stepId) {
     case 'cleanup-environment':
       return cleanupEnvironmentStep();
@@ -886,6 +1229,8 @@ async function executeStep(stepId: AutomationStepId): Promise<ActionResult> {
       return fillProfileStepModule(profileStepContext());
     case 'read-chatgpt-session':
       return readSessionStepModule(checkoutStepContext());
+    case 'run-plus-checkout-closure':
+      return runPlusCheckoutClosureInBrowser(await automationTargetTabId(), () => stopRequested);
     case 'create-checkout-link':
       return createCheckoutLinkStepModule(checkoutStepContext());
     case 'open-checkout-link':
@@ -918,13 +1263,49 @@ async function executeStep(stepId: AutomationStepId): Promise<ActionResult> {
 }
 
 async function selectEmailStep(): Promise<ActionResult> {
-  const state = await loadAutomationState();
+  let state = await loadAutomationState();
   if (state.settings.registrationMode === 'phone') {
     return selectRegisterPhoneStep();
   }
   const selected = selectEmail(state);
   if (!selected) {
-    return { ok: false, message: '没有可用邮箱，请先在自动化设置页添加邮箱' };
+    // auto pull from Acica when pool empty
+  {
+    const acica = normalizeAcicaMailboxSettings(state.settings.acicaMailbox || DEFAULT_ACICA_MAILBOX_SETTINGS);
+    if (acica.enabled && acica.autoSyncOnEmpty) {
+      try {
+        const synced = await browser.runtime.sendMessage({
+          type: 'opx:acica-sync-emails',
+          settings: acica,
+        }) as { ok?: boolean; message?: string; lines?: string[]; count?: number };
+        if (synced?.ok && Array.isArray(synced.lines) && synced.lines.length) {
+          const nextRaw = [...new Set([...(state.settings.rawEmails || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean), ...synced.lines])].join('\n');
+          await saveAutomationSettings({
+            rawEmails: nextRaw,
+            acicaMailbox: acica,
+          });
+          await appendAutomationLog('info', synced.message || `已从 Acica 自动同步 ${synced.count || synced.lines.length} 个邮箱`, 'select-email');
+          state = await loadAutomationState();
+          const again = selectEmail(state);
+          if (again) {
+            // fall through by reusing selected below via recursive-ish path
+            const emails = state.emails.map((email) => email.id === again.id
+              ? { ...email, status: 'running' as const, useCount: email.useCount + 1, lastUsedAt: Date.now(), lastMessage: '当前流程正在使用' }
+              : email);
+            await updateAutomationEmails(emails);
+            await writeRegisterStateFromEmail(again);
+            await updateAutomationRun({ selectedEmailId: again.id, sessionEmail: again.email });
+            return { ok: true, message: `已自动同步并选择邮箱：${again.email}` };
+          }
+        } else if (synced?.message) {
+          await appendAutomationLog('warn', `Acica 自动同步未得到可用邮箱：${synced.message}`, 'select-email');
+        }
+      } catch (error) {
+        await appendAutomationLog('warn', `Acica 自动同步失败：${error instanceof Error ? error.message : String(error)}`, 'select-email');
+      }
+    }
+  }
+  return { ok: false, message: '没有可用邮箱，请先点“从 Acica 自动同步”或在设置页添加邮箱' };
   }
 
   const emails = state.emails.map((email) => email.id === selected.id
@@ -940,9 +1321,11 @@ async function selectEmailStep(): Promise<ActionResult> {
   await saveRegisterState({
     rawInput: selected.rawInput,
     email: selected.email,
-    accountLine: selected.rawInput.includes('----') ? selected.rawInput : '',
-    inputMode: selected.rawInput.includes('----') ? 'outlook-line' : 'email',
-    autoOtp: selected.rawInput.includes('----'),
+    accountLine: selected.rawInput.includes('----') || /---/.test(selected.rawInput)
+      ? selected.rawInput
+      : selected.email,
+    inputMode: selected.rawInput.includes('----') || /---/.test(selected.rawInput) ? 'outlook-line' : 'email',
+    autoOtp: true,
     otpRequestedAt: 0,
     otpAutoPending: false,
     otpAutoRunning: false,
@@ -1159,6 +1542,11 @@ async function submitOpenAiCheckoutStep(): Promise<ActionResult> {
     return ready;
   }
   await appendAutomationLog('info', `OpenAI 订阅页准备提交：${summarizeActionData(ready.data)}`, 'submit-openai-checkout');
+
+  const qualification = await captureAutomationCheckoutQualification(ready.data);
+  if (qualification) {
+    return qualification;
+  }
 
   let lastResult: ActionResult = { ok: false, message: '尚未提交 OpenAI 订阅页' };
   for (let attempt = 1; attempt <= PAYMENT_PROFILE_ATTEMPTS; attempt += 1) {
@@ -1406,15 +1794,23 @@ async function cleanupEnvironmentStep(): Promise<ActionResult> {
 
 async function triggerStartCleanup(): Promise<{ ok: boolean; message: string }> {
   try {
-    const [state, targetTab] = await Promise.all([loadAutomationState(), getAutomationTargetTab()]);
+    const [state, targetTab] = await withTimeout(
+      Promise.all([loadAutomationState(), getAutomationTargetTab()]),
+      5_000,
+      '读取自动化目标标签页超时',
+    );
     const windowId = targetTab?.windowId || (state.run.targetWindowId > 0 ? state.run.targetWindowId : undefined);
-    const response = await browser.runtime.sendMessage({
+    const closeTargetTabs = typeof windowId === 'number';
+    const response = await Promise.race([
+      browser.runtime.sendMessage({
       type: 'opx:automation-finish-cleanup',
       cookieTargets: ['paypal', 'chatgpt'],
-      closeTabs: true,
+      closeTabs: closeTargetTabs,
       windowId,
       closeDelayMs: 0,
-    }) as AutomationFinishCleanupResponse;
+      }) as Promise<AutomationFinishCleanupResponse>,
+      timeoutCleanupResponse(20_000),
+    ]);
     if (!response?.message) {
       return { ok: false, message: '开始前清理已触发，但没有返回状态' };
     }
@@ -1422,13 +1818,15 @@ async function triggerStartCleanup(): Promise<{ ok: boolean; message: string }> 
       await interruptibleDelay(900);
     }
     return {
-      ok: Boolean(response.ok),
-      message: response.ok ? `开始前${response.message}` : `开始前清理部分失败：${response.message}`,
+      ok: true, // FPI compat: do not block register chain
+      message: response.ok
+        ? `开始前${response.message}${closeTargetTabs ? '' : '（没有已绑定目标窗口，仅清理 Cookie）'}`
+        : `开始前清理已尽量执行：${response.message}`,
     };
   } catch (error) {
     return {
-      ok: false,
-      message: `开始前清理触发失败：${error instanceof Error ? error.message : String(error)}`,
+      ok: true, // FPI: cleanup trigger error should not hard-stop
+      message: `开始前清理触发异常已忽略：${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }
@@ -1437,13 +1835,16 @@ async function triggerRegisterPhoneRetryCleanup(): Promise<{ ok: boolean; messag
   try {
     const [state, targetTab] = await Promise.all([loadAutomationState(), getAutomationTargetTab()]);
     const windowId = targetTab?.windowId || (state.run.targetWindowId > 0 ? state.run.targetWindowId : undefined);
-    const response = await browser.runtime.sendMessage({
+    const response = await Promise.race([
+      browser.runtime.sendMessage({
       type: 'opx:automation-finish-cleanup',
       cookieTargets: ['chatgpt'],
       closeTabs: true,
       windowId,
       closeDelayMs: 0,
-    }) as AutomationFinishCleanupResponse;
+      }) as Promise<AutomationFinishCleanupResponse>,
+      timeoutCleanupResponse(15_000),
+    ]);
     if (!response?.message) {
       return { ok: false, message: '手机号注册重试清理已触发，但没有返回状态' };
     }
@@ -1464,11 +1865,14 @@ async function triggerRegisterPhoneRetryCleanup(): Promise<{ ok: boolean; messag
 
 async function triggerAutomationCookieCleanupOnly(cookieTargets: CookieClearTarget[] = ['paypal', 'chatgpt']): Promise<{ ok: boolean; message: string }> {
   try {
-    const response = await browser.runtime.sendMessage({
+    const response = await Promise.race([
+      browser.runtime.sendMessage({
       type: 'opx:automation-finish-cleanup',
       cookieTargets,
       closeTabs: false,
-    }) as AutomationFinishCleanupResponse;
+      }) as Promise<AutomationFinishCleanupResponse>,
+      timeoutCleanupResponse(15_000),
+    ]);
     if (!response?.message) {
       return { ok: false, message: 'Cookie 清理没有返回状态' };
     }
@@ -1482,6 +1886,21 @@ async function triggerAutomationCookieCleanupOnly(cookieTargets: CookieClearTarg
       message: `Cookie 清理触发失败：${error instanceof Error ? error.message : String(error)}`,
     };
   }
+}
+
+function isQualificationCapturedResult(result: ActionResult): boolean {
+  return isRecord(result.data) && result.data.qualificationCaptured === true;
+}
+
+function timeoutCleanupResponse(timeoutMs: number): Promise<AutomationFinishCleanupResponse> {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(() => resolve({
+      ok: false,
+      cookieResults: [],
+      message: `Cookie 清理响应超时（${Math.round(timeoutMs / 1000)} 秒）`,
+      closeTabsScheduled: false,
+    }), timeoutMs);
+  });
 }
 
 async function waitForAutomationTabUrl(predicate: (url: URL) => boolean, timeoutMs: number): Promise<URL> {

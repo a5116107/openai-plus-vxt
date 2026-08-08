@@ -5,9 +5,8 @@ import type { RandomAddressMessage } from '../src/features/address-autofill/type
 import { loadAutomationState, loadOAuthState, saveOAuthState } from '../src/app/state';
 import { sendTabMessage } from '../src/app/active-tab';
 import {
-  createCheckoutLinkDirect,
-  createCheckoutLinkFromServer,
-  normalizeCheckoutExtractMode,
+  createCheckoutLinkWithPolicy,
+  normalizeCheckoutCreationPolicy,
 } from '../src/features/link-extractor/checkout';
 import { fetchChatGptSession } from '../src/features/link-extractor/session';
 import type {
@@ -15,6 +14,7 @@ import type {
   ChatGptSessionResponse,
   CheckoutLinkMessage,
   CheckoutLinkResponse,
+  CheckoutIdentitySnapshot,
 } from '../src/features/link-extractor/types';
 import { createCpaJson, createCredentialsFromChatGptSession, createSub2ApiJson } from '../src/features/oauth/export';
 import { createOAuthSession, exchangeOAuthCode, OAuthTokenExchangeError, parseOAuthCallbackUrl } from '../src/features/oauth/oauth';
@@ -39,6 +39,11 @@ import { createOAuthPhoneProvider } from '../src/features/oauth-phone/providers'
 import { selectOAuthPhoneOfferForRuntime } from '../src/features/oauth-phone/service';
 import { appendAutomationLog } from '../src/features/automation/state';
 import {
+  getAuthNetworkResult,
+  installAuthNetworkObserver,
+  isAuthNetworkResultRequest,
+} from '../src/features/automation/auth-network-observer';
+import {
   loadOAuthPhoneSettings,
   saveOAuthPhoneSettings,
   trackedOrderId,
@@ -59,6 +64,15 @@ import type {
   OutlookOtpMessage,
   OutlookOtpResponse,
 } from '../src/features/register/types';
+import {
+  DEFAULT_ACICA_MAILBOX_SETTINGS,
+  extractEmailFromAccountLine,
+  normalizeAcicaMailboxSettings,
+  pollAcicaOtp,
+  pollMailboxUrlOtp,
+  syncAcicaEmailPool,
+  type AcicaMailboxSettings,
+} from '../src/features/mailbox/acica';
 import type {
   AutomationFinishCleanupMessage,
   AutomationFinishCleanupResponse,
@@ -67,6 +81,77 @@ import type {
   CookieClearTarget,
 } from '../src/features/settings/types';
 import type { SmsRelayFetchMessage, SmsRelayFetchResponse } from '../src/features/sms/types';
+
+import {
+  applyProxyStage,
+  applyAutomationProxyStage,
+  clearProxyStage,
+  getProxyRuntimeStatus,
+  saveAndMaybeApplyProxy,
+} from '../src/features/proxy/service';
+import type {
+  ProxyApplyRequest,
+  ProxyAutomationStageRequest,
+  ProxyClearRequest,
+  ProxySaveRequest,
+  ProxyStatusRequest,
+} from '../src/features/proxy/types';
+
+import {
+  applyProbeAccountAction,
+  clearProbeHits,
+  controlProbe,
+  deleteProbeHitDatabaseRecord,
+  deleteProbeTask,
+  exportProbeHitDatabase,
+  exportProbeFactorAnalysis,
+  exportProbeMethodDetections,
+  queryProbeMethodDetections,
+  clearProbeMethodDetections,
+  getProbeAccountReport,
+  queryProbeFactorAnalysis,
+  clearProbeFactorAnalysis,
+  importProbeFactorObservations,
+  getProbeStateResponse,
+  handleProbeAlarm,
+  ensureSmartProbeBootstrap,
+  importSessionToProbePool,
+  queryProbeHitDatabase,
+  saveProbeAccounts,
+  upsertProbeTask,
+} from '../src/features/probe/service';
+import {
+  handleRunLogAppend,
+  handleRunLogClear,
+  handleRunLogExport,
+  handleRunLogList,
+} from '../src/features/run-log/service';
+import type {
+  RunLogAppendMessage,
+  RunLogClearMessage,
+  RunLogExportMessage,
+  RunLogListMessage,
+} from '../src/features/run-log/types';
+import type {
+  ProbeAccountActionMessage,
+  ProbeAccountReportMessage,
+  ProbeClearHitsMessage,
+  ProbeControlMessage,
+  ProbeDeleteTaskMessage,
+  ProbeHitDbDeleteMessage,
+  ProbeHitDbExportMessage,
+  ProbeMethodsQueryMessage,
+  ProbeMethodsExportMessage,
+  ProbeMethodsClearMessage,
+  ProbeHitDbQueryMessage,
+  ProbeFactorQueryMessage,
+  ProbeFactorExportMessage,
+  ProbeFactorClearMessage,
+  ProbeFactorImportMessage,
+  ProbeSaveAccountsMessage,
+  ProbeStateMessage,
+  ProbeUpsertTaskMessage,
+} from '../src/features/probe/types';
 
 type MessageSenderLike = {
   tab?: {
@@ -102,10 +187,27 @@ export default defineBackground(() => {
   installActionSidePanelFallback();
   installContentDriverInjector();
   installOAuthCallbackWatcher();
+  installProbeAlarmListener();
+  installAuthNetworkObserver();
 
   browser.runtime.onMessage.addListener((message: unknown, sender) => {
+    if (isAuthNetworkResultRequest(message)) {
+      return getAuthNetworkResult(message);
+    }
     if (isOutlookOtpMessage(message)) {
       return waitForOutlookOtp(message);
+    }
+    if (isAcicaSyncEmailsMessage(message)) {
+      return handleAcicaSyncEmails(message);
+    }
+    if (isAcicaOtpMessage(message)) {
+      return waitForAcicaOtp(message);
+    }
+    if (isTrustedFillEmailMessage(message)) {
+      return trustedFillEmail(message);
+    }
+    if (isTrustedFillOtpMessage(message)) {
+      return trustedFillOtp(message);
     }
     if (isOutlookOtpCancelMessage(message)) {
       return cancelOutlookOtp(message);
@@ -133,7 +235,7 @@ export default defineBackground(() => {
       return createCheckoutLinkByMode(message);
     }
     if (isChatGptSessionMessage(message)) {
-      return fetchChatGptSessionForSender(sender);
+      return fetchChatGptSessionForSender(message, sender);
     }
     if (isRandomAddressMessage(message)) {
       return fetchRandomAddress(message.countryCode, message.city);
@@ -146,6 +248,110 @@ export default defineBackground(() => {
     }
     if (isAutomationFinishCleanupMessage(message)) {
       return finishAutomationCleanup(message);
+    }
+    if (isProxyApplyMessage(message)) {
+      return applyProxyStage(message.stage);
+    }
+    if (isProxyAutomationStageMessage(message)) {
+      return applyAutomationProxyStage(message.stage, message.cycleId, Boolean(message.forceRotate), {
+        excludeIps: message.excludeIps,
+        requireDifferentIp: message.requireDifferentIp,
+        reason: message.reason,
+      });
+    }
+    if (isProxyClearMessage(message)) {
+      return clearProxyStage();
+    }
+    if (isProxyStatusMessage(message)) {
+      return getProxyRuntimeStatus();
+    }
+    if (isProxySaveMessage(message)) {
+      return saveAndMaybeApplyProxy(message.settings || {}, message.applyStage);
+    }
+    if (isProbeSaveAccountsMessage(message)) {
+      return saveProbeAccounts(message.rawAccounts || '');
+    }
+    if (isProbeSyncCurrentSessionMessage(message)) {
+      return syncCurrentChatGptSessionToProbePool();
+    }
+    if (isProbeUpsertTaskMessage(message)) {
+      return upsertProbeTask({ id: message.task?.id, config: message.task.config });
+    }
+    if (isProbeDeleteTaskMessage(message)) {
+      return deleteProbeTask(message.taskId);
+    }
+    if (isProbeControlMessage(message)) {
+      return controlProbe(message.action, message.taskId);
+    }
+    if (isProbeClearHitsMessage(message)) {
+      return clearProbeHits(message.scope || 'all');
+    }
+    if (isProbeHitDbQueryMessage(message)) {
+      return queryProbeHitDatabase(message.filter || {});
+    }
+    if (isProbeHitDbDeleteMessage(message)) {
+      return deleteProbeHitDatabaseRecord(message.dbId);
+    }
+    if (isProbeHitDbExportMessage(message)) {
+      return exportProbeHitDatabase(message.filter || {});
+    }
+    if (isProbeMethodsQueryMessage(message)) {
+    return queryProbeMethodDetections();
+  }
+  if (isProbeMethodsExportMessage(message)) {
+    return exportProbeMethodDetections();
+  }
+  if (isProbeMethodsClearMessage(message)) {
+    return clearProbeMethodDetections();
+  }
+    if (isProbeAccountReportMessage(message)) {
+      return getProbeAccountReport();
+    }
+    if (isProbeAccountActionMessage(message)) {
+      return applyProbeAccountAction(message.action, message.accountIds);
+    }
+    if (isProbeFactorQueryMessage(message)) {
+      return queryProbeFactorAnalysis();
+    }
+    if (isProbeFactorExportMessage(message)) {
+      return exportProbeFactorAnalysis(message.format || 'json');
+    }
+    if (isProbeFactorClearMessage(message)) {
+      return clearProbeFactorAnalysis();
+    }
+    if (isProbeFactorImportMessage(message)) {
+      return importProbeFactorObservations(message.text, message.format || 'auto', message.mode || 'merge');
+    }
+    if (isRunLogListMessage(message)) {
+    return handleRunLogList({ limit: message.limit, accountId: message.accountId, level: message.level });
+  }
+  if (isRunLogAppendMessage(message)) {
+    return handleRunLogAppend(message.event);
+  }
+  if (isRunLogClearMessage(message)) {
+    return handleRunLogClear();
+  }
+  if (isRunLogExportMessage(message)) {
+    return handleRunLogExport(message.format || 'csv');
+  }
+  if (isProbeStateMessage(message)) {
+      return getProbeStateResponse();
+    }
+    if (isProbeSmartStartMessage(message)) {
+      return ensureSmartProbeBootstrap({
+        runHealthCheck: message.runHealthCheck !== false,
+        startScheduled: Boolean(message.startScheduled),
+        runOnce: message.runOnce !== false && !message.startScheduled,
+      });
+    }
+    if (isProbeImportSessionMessage(message)) {
+      return importSessionToProbePool({
+        email: message.email,
+        chatgptAccountId: message.chatgptAccountId,
+        tokenRaw: message.tokenRaw,
+        source: message.source === 'automation' ? 'automation' : 'session',
+        identitySnapshot: message.identitySnapshot,
+      });
     }
     return undefined;
   });
@@ -177,23 +383,46 @@ function installActionSidePanelFallback(): void {
 }
 
 async function openSidePanel(tab: ChromeTab): Promise<void> {
+  // 1) Chrome sidePanel API
   const sidePanel = getNativeSidePanelApi();
-  if (!sidePanel?.open) {
-    return;
+  if (sidePanel?.open) {
+    const options: SidePanelOpenOptions = {};
+    if (typeof tab.windowId === 'number') {
+      options.windowId = tab.windowId;
+    } else if (typeof tab.id === 'number') {
+      options.tabId = tab.id;
+    }
+    if (options.windowId !== undefined || options.tabId !== undefined) {
+      try {
+        await sidePanel.open(options);
+        return;
+      } catch (error) {
+        console.debug('[OPX] side panel open skipped', error);
+      }
+    }
   }
-  const options: SidePanelOpenOptions = {};
-  if (typeof tab.windowId === 'number') {
-    options.windowId = tab.windowId;
-  } else if (typeof tab.id === 'number') {
-    options.tabId = tab.id;
+
+  // 2) Firefox/Mullvad sidebarAction
+  const sidebarAction = getNativeSidebarActionApi();
+  if (sidebarAction?.open) {
+    try {
+      await Promise.resolve(sidebarAction.open());
+      return;
+    } catch (error) {
+      console.debug('[OPX] sidebarAction open skipped', error);
+    }
   }
-  if (options.windowId === undefined && options.tabId === undefined) {
-    return;
-  }
+
+  // 3) Final fallback: open settings page as tab (always visible)
   try {
-    await sidePanel.open(options);
+    const url = browser.runtime.getURL('/automation-settings.html');
+    await browser.tabs.create({
+      url,
+      active: true,
+      ...(typeof tab.windowId === 'number' ? { windowId: tab.windowId } : {}),
+    });
   } catch (error) {
-    console.debug('[OPX] side panel open skipped', error);
+    console.debug('[OPX] open automation-settings fallback failed', error);
   }
 }
 
@@ -202,7 +431,18 @@ function getNativeSidePanelApi(): NativeSidePanelApi | undefined {
 }
 
 function getNativeActionApi(): NativeActionApi | undefined {
-  return getNativeChromeApi().chrome?.action;
+  const root = getNativeChromeApi();
+  return root.chrome?.action
+    || root.browser?.action
+    || root.browser?.browserAction
+    || root.chrome?.browserAction;
+}
+
+function getNativeSidebarActionApi(): NativeSidebarActionApi | undefined {
+  const root = getNativeChromeApi();
+  return root.browser?.sidebarAction
+    || root.chrome?.sidebarAction
+    || (browser as typeof browser & { sidebarAction?: NativeSidebarActionApi }).sidebarAction;
 }
 
 function getNativeChromeApi(): NativeChromeRoot {
@@ -213,17 +453,16 @@ async function clearDomainCookies(target: CookieClearTarget): Promise<ClearDomai
   const domains = COOKIE_CLEAR_DOMAINS[target];
   let removed = 0;
   let failed = 0;
+  const seen = new Set<string>();
 
   for (const domain of domains) {
-    const cookies = await browser.cookies.getAll({ domain });
+    const cookies = await listDomainCookiesForClear(domain);
     for (const cookie of cookies) {
+      const key = cookieIdentityKey(cookie);
+      if (seen.has(key)) continue;
+      seen.add(key);
       try {
-        await browser.cookies.remove({
-          name: cookie.name,
-          storeId: cookie.storeId,
-          url: cookieUrl(cookie),
-          ...(cookie.partitionKey ? { partitionKey: cookie.partitionKey } : {}),
-        });
+        await removeCookieCompatible(cookie);
         removed += 1;
       } catch (error) {
         failed += 1;
@@ -231,21 +470,50 @@ async function clearDomainCookies(target: CookieClearTarget): Promise<ClearDomai
           target,
           domain: cookie.domain,
           name: cookie.name,
+          firstPartyDomain: (cookie as Browser.cookies.Cookie & { firstPartyDomain?: string }).firstPartyDomain || '',
           error,
         });
       }
     }
   }
 
+  if (removed === 0 || failed > 0) {
+    const fallback = await clearDomainsViaBrowsingData(domains).catch((error) => {
+      console.debug('[OPX] browsingData cookie fallback failed', error);
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    });
+    if (fallback.ok) {
+      const label = target === 'paypal' ? 'PayPal' : 'ChatGPT/OpenAI';
+      return {
+        ok: true,
+        target,
+        domains,
+        removed: Math.max(removed, 1),
+        failed: 0,
+        message: label + ' cookie 已通过兼容清理完成（FPI/browsingData）· 精确删除 ' + removed + ' 个',
+      };
+    }
+  }
+
   const label = target === 'paypal' ? 'PayPal' : 'ChatGPT/OpenAI';
-  if (failed > 0) {
+  if (failed > 0 && removed === 0) {
     return {
       ok: false,
       target,
       domains,
       removed,
       failed,
-      message: `${label} 已清除 ${removed} 个 cookie，${failed} 个清除失败`,
+      message: label + ' cookie 清理失败（可能是 First-Party Isolation）：精确删除 0，失败 ' + failed,
+    };
+  }
+  if (failed > 0) {
+    return {
+      ok: true,
+      target,
+      domains,
+      removed,
+      failed,
+      message: label + ' 已清除 ' + removed + ' 个 cookie（' + failed + ' 个跳过，已尽量兼容 FPI）',
     };
   }
   return {
@@ -254,8 +522,108 @@ async function clearDomainCookies(target: CookieClearTarget): Promise<ClearDomai
     domains,
     removed,
     failed,
-    message: `${label} 已清除 ${removed} 个 cookie`,
+    message: label + ' 已清除 ' + removed + ' 个 cookie',
   };
+}
+
+function cookieIdentityKey(cookie: Browser.cookies.Cookie): string {
+  const c = cookie as Browser.cookies.Cookie & { firstPartyDomain?: string; partitionKey?: unknown };
+  return [c.name, c.domain, c.path, c.storeId || '', c.firstPartyDomain || '', JSON.stringify(c.partitionKey || null)].join('|');
+}
+
+async function listDomainCookiesForClear(domain: string): Promise<Browser.cookies.Cookie[]> {
+  const variants: Array<Record<string, unknown>> = [
+    { domain, firstPartyDomain: '' },
+    { domain },
+  ];
+  for (const host of ['chatgpt.com', 'openai.com', 'pay.openai.com', 'auth.openai.com', 'paypal.com', 'www.paypal.com']) {
+    if (host === domain || host.endsWith('.' + domain) || domain.endsWith(host)) {
+      variants.push({ domain, firstPartyDomain: host });
+      variants.push({ firstPartyDomain: host });
+    }
+  }
+
+  const all: Browser.cookies.Cookie[] = [];
+  for (const query of variants) {
+    try {
+      const batch = await browser.cookies.getAll(query as any);
+      for (const cookie of batch) {
+        const host = String(cookie.domain || '').replace(/^\./, '');
+        if (host === domain || host.endsWith('.' + domain) || domain.endsWith(host)) {
+          all.push(cookie);
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/firstPartyDomain/i.test(message) && !Object.prototype.hasOwnProperty.call(query, 'firstPartyDomain')) {
+        try {
+          const batch = await browser.cookies.getAll({ ...(query as object), firstPartyDomain: '' } as any);
+          all.push(...batch);
+        } catch (retryError) {
+          console.debug('[OPX] cookies.getAll FPI retry failed', { domain, query, retryError });
+        }
+      } else {
+        console.debug('[OPX] cookies.getAll failed', { domain, query, error });
+      }
+    }
+  }
+  return all;
+}
+
+async function removeCookieCompatible(cookie: Browser.cookies.Cookie): Promise<void> {
+  const c = cookie as Browser.cookies.Cookie & { firstPartyDomain?: string; partitionKey?: unknown };
+  const base: Record<string, unknown> = {
+    name: cookie.name,
+    storeId: cookie.storeId,
+    url: cookieUrl(cookie),
+  };
+  if (c.partitionKey) base.partitionKey = c.partitionKey;
+
+  const attempts: Array<Record<string, unknown>> = [
+    { ...base, firstPartyDomain: typeof c.firstPartyDomain === 'string' ? c.firstPartyDomain : '' },
+    { ...base, firstPartyDomain: '' },
+    { ...base },
+  ];
+
+  let lastError: unknown;
+  for (const details of attempts) {
+    try {
+      await browser.cookies.remove(details as any);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError || 'cookie remove failed'));
+}
+
+async function clearDomainsViaBrowsingData(domains: string[]): Promise<{ ok: boolean; message: string }> {
+  const browsingData = (browser as typeof browser & {
+    browsingData?: {
+      remove?: (options: Record<string, unknown>, dataToRemove: Record<string, unknown>) => Promise<void>;
+    };
+  }).browsingData;
+  if (!browsingData?.remove) {
+    return { ok: false, message: 'browsingData API unavailable' };
+  }
+  const hostnames = [...new Set(domains.flatMap((domain) => {
+    const root = domain.replace(/^\./, '');
+    return [root, 'www.' + root];
+  }))];
+  try {
+    await browsingData.remove({ hostnames, since: 0 }, { cookies: true });
+    return { ok: true, message: 'browsingData removed cookies for ' + hostnames.join(',') };
+  } catch (error) {
+    try {
+      await browsingData.remove({ since: 0 }, { cookies: true });
+      return { ok: true, message: 'browsingData removed all cookies (broad fallback)' };
+    } catch (broadError) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : String(broadError || error),
+      };
+    }
+  }
 }
 
 async function finishAutomationCleanup(message: AutomationFinishCleanupMessage): Promise<AutomationFinishCleanupResponse> {
@@ -329,15 +697,18 @@ function cookieUrl(cookie: Browser.cookies.Cookie): string {
 }
 
 async function createCheckoutLinkByMode(message: CheckoutLinkMessage): Promise<CheckoutLinkResponse> {
-  const extractMode = normalizeCheckoutExtractMode(message.extractMode);
-  if (extractMode === 'server') {
-    return createCheckoutLinkFromServer(message.raw, message.options);
-  }
-  return createCheckoutLinkDirect(message.raw, message.options);
+  const creationPolicy = normalizeCheckoutCreationPolicy({
+    ...message.creationPolicy,
+    transport: message.creationPolicy?.transport || (message.extractMode === 'server' ? 'server' : 'browser-direct'),
+  }, message.options);
+  return createCheckoutLinkWithPolicy(message.raw, message.options, creationPolicy);
 }
 
-async function fetchChatGptSessionForSender(sender: MessageSenderLike): Promise<ChatGptSessionResponse> {
-  const tabId = sender.tab?.id;
+async function fetchChatGptSessionForSender(
+  message: ChatGptSessionMessage,
+  sender: MessageSenderLike,
+): Promise<ChatGptSessionResponse> {
+  const tabId = typeof message.tabId === 'number' ? message.tabId : sender.tab?.id;
   if (typeof tabId !== 'number') {
     return fetchChatGptSession();
   }
@@ -361,6 +732,32 @@ async function fetchChatGptSessionForSender(sender: MessageSenderLike): Promise<
       message: `无法在当前标签页读取 ChatGPT session：${String(error)}`,
     };
   }
+}
+
+async function syncCurrentChatGptSessionToProbePool() {
+  const response = await fetchChatGptSession();
+  if (!response.ok || !response.session?.accessToken) {
+    const current = await getProbeStateResponse();
+    return {
+      ok: false,
+      message: `当前 ChatGPT 登录会话同步失败：${response.message}`,
+      state: current.state,
+    };
+  }
+  const imported = await importSessionToProbePool({
+    email: response.session.email,
+    chatgptAccountId: response.session.accountId,
+    tokenRaw: response.session.accessToken,
+    source: 'session',
+    identitySnapshot: response.session.identitySnapshot,
+  });
+  const cookieCount = response.session.identitySnapshot?.cookies?.length || 0;
+  return {
+    ...imported,
+    message: imported.ok
+      ? `已同步当前 ChatGPT 登录会话，身份 Cookie ${cookieCount} 个`
+      : imported.message,
+  };
 }
 
 async function fetchChatGptSessionInTab(): Promise<ChatGptSessionResponse> {
@@ -2854,6 +3251,441 @@ async function exchangeCurrentOAuthCodeUnlocked(
   }
 }
 
+
+async function handleAcicaSyncEmails(message: { type: 'opx:acica-sync-emails'; settings?: unknown }): Promise<{ ok: boolean; message: string; count: number; lines: string[]; emails: string[] }> {
+  const settings = normalizeAcicaMailboxSettings(message.settings || DEFAULT_ACICA_MAILBOX_SETTINGS);
+  const result = await syncAcicaEmailPool(settings);
+  return {
+    ok: result.ok,
+    message: result.message,
+    count: result.count,
+    lines: result.lines,
+    emails: result.emails,
+  };
+}
+
+async function waitForAcicaOtp(message: {
+  type: 'opx:wait-acica-otp';
+  jobId?: string;
+  email: string;
+  settings?: unknown;
+  timeoutMs?: number;
+  ignoreCodes?: string[];
+}): Promise<OutlookOtpResponse> {
+  const jobId = message.jobId || makeOutlookJobId();
+  const settings = normalizeAcicaMailboxSettings(message.settings || DEFAULT_ACICA_MAILBOX_SETTINGS);
+  const email = extractEmailFromAccountLine(message.email) || String(message.email || '').trim();
+  const deadline = Date.now() + (message.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const aborter = new AbortController();
+  outlookOtpAborters.set(jobId, aborter);
+  const ignored = new Set((message.ignoreCodes || []).map((code) => String(code || '').trim()).filter(Boolean));
+
+  try {
+    while (Date.now() <= deadline) {
+      if (aborter.signal.aborted) {
+        return { ok: false, canceled: true, message: '已停止邮箱验证码接收' };
+      }
+      const remainSec = Math.max(5, Math.min(settings.otpWaitSeconds, Math.ceil((deadline - Date.now()) / 1000)));
+      const result = await pollAcicaOtp(email, settings, {
+        signal: aborter.signal,
+        waitSeconds: remainSec,
+        keyword: 'ChatGPT',
+        since: Number((message as { since?: number }).since || 0),
+      });
+      if (result.ok && result.code && !ignored.has(result.code)) {
+        return { ok: true, code: result.code, message: result.message };
+      }
+      if (result.fatal) {
+        return { ok: false, message: result.message, failureKind: result.failureKind };
+      }
+      await delay(Math.max(1000, settings.otpPollIntervalSec * 1000), aborter.signal);
+    }
+    return { ok: false, message: '等待 Acica 验证码超时', failureKind: 'mail_not_arrived' };
+  } finally {
+    if (outlookOtpAborters.get(jobId) === aborter) {
+      outlookOtpAborters.delete(jobId);
+    }
+  }
+}
+
+function isAcicaSyncEmailsMessage(message: unknown): message is { type: 'opx:acica-sync-emails'; settings?: unknown } {
+  return Boolean(message && typeof message === 'object' && (message as { type?: unknown }).type === 'opx:acica-sync-emails');
+}
+
+function isAcicaOtpMessage(message: unknown): message is { type: 'opx:wait-acica-otp'; email: string } {
+  return Boolean(
+    message &&
+      typeof message === 'object' &&
+      (message as { type?: unknown }).type === 'opx:wait-acica-otp' &&
+      typeof (message as { email?: unknown }).email === 'string',
+  );
+}
+
+function isTrustedFillEmailMessage(message: unknown): message is { type: 'opx:trusted-fill-email'; tabId: number; email: string } {
+  return Boolean(
+    message &&
+    typeof message === 'object' &&
+    (message as { type?: string }).type === 'opx:trusted-fill-email' &&
+    Number.isFinite((message as { tabId?: number }).tabId) &&
+    typeof (message as { email?: string }).email === 'string',
+  );
+}
+
+function isTrustedFillOtpMessage(message: unknown): message is { type: 'opx:trusted-fill-otp'; tabId: number; code: string } {
+  return Boolean(
+    message &&
+    typeof message === 'object' &&
+    (message as { type?: string }).type === 'opx:trusted-fill-otp' &&
+    Number.isFinite((message as { tabId?: number }).tabId) &&
+    typeof (message as { code?: string }).code === 'string',
+  );
+}
+
+async function trustedFillOtp(message: { tabId: number; code: string }): Promise<{
+  ok: boolean;
+  message: string;
+  data?: Record<string, unknown>;
+}> {
+  const debuggerApi = getNativeChromeApi().chrome?.debugger;
+  if (!debuggerApi) {
+    return { ok: false, message: '当前浏览器不支持验证码受信任输入' };
+  }
+  const target = { tabId: message.tabId };
+  let attached = false;
+  try {
+    await debuggerApi.attach(target, '1.3');
+    attached = true;
+    const controlsExpression = `(() => {
+        const visible = (el) => {
+          if (!el) return false;
+          const r = el.getBoundingClientRect();
+          const s = getComputedStyle(el);
+          return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+        };
+        const specificInputs = Array.from(document.querySelectorAll('input[autocomplete="one-time-code"], input[name="code"], input[inputmode="numeric"]')).filter(visible);
+        const inputs = specificInputs.length > 0
+          ? specificInputs
+          : Array.from(document.querySelectorAll('input')).filter(visible);
+        const input = inputs[0];
+        const buttons = Array.from(document.querySelectorAll('button')).filter(visible);
+        const button = buttons.find((el) => el.type === 'submit') || buttons.find((el) => /继续|continue/i.test(el.textContent || ''));
+        const point = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+        const bodyText = (document.body?.innerText || document.body?.textContent || '').replace(/\\s+/g, ' ').trim();
+        const errorMatch = bodyText.match(/(代码不正确|验证码不正确|incorrect code|invalid code|wrong code)[^。.!?]{0,160}/i);
+        const buttonText = (button?.textContent || '').replace(/\\s+/g, ' ').trim();
+        const buttonDisabled = Boolean(button && (button.disabled || button.matches(':disabled')));
+        const buttonAriaDisabled = button?.getAttribute('aria-disabled') === 'true';
+        const buttonBusy = Boolean(button && (
+          buttonDisabled ||
+          buttonAriaDisabled ||
+          button.getAttribute('aria-busy') === 'true' ||
+          /loading|submitting|verifying|处理中|正在验证|请稍候/i.test(buttonText)
+        ));
+        return {
+          input: input ? point(input) : null,
+          button: button ? point(button) : null,
+          values: inputs.map((el) => String(el.value || '')),
+          combinedValue: inputs.map((el) => String(el.value || '')).join(''),
+          buttonDisabled,
+          buttonAriaDisabled,
+          buttonBusy,
+          buttonText,
+          url: location.href,
+          pathname: location.pathname,
+          errorText: errorMatch ? errorMatch[0] : '',
+        };
+      })()`;
+    const points = await locateTrustedFormControls(debuggerApi, target, controlsExpression);
+    if (!points?.input || !points.button) {
+      return { ok: false, message: '验证码受信任输入没有找到输入框或继续按钮' };
+    }
+    await debuggerClick(debuggerApi, target, points.input.x, points.input.y);
+    await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+      type: 'keyDown', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2,
+    });
+    await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+      type: 'keyUp', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2,
+    });
+    await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+      type: 'keyDown', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8,
+    });
+    await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+      type: 'keyUp', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8,
+    });
+    await debuggerTypeText(debuggerApi, target, message.code);
+    const ready = await waitForTrustedOtpReady(
+      debuggerApi,
+      target,
+      controlsExpression,
+      message.code,
+      5_000,
+    );
+    if (!ready?.input || !ready.button) {
+      return {
+        ok: false,
+        message: '验证码输入后页面未进入可提交状态',
+        data: trustedOtpDiagnostics(ready, 'input-not-ready'),
+      };
+    }
+    await debuggerClick(debuggerApi, target, ready.button.x, ready.button.y);
+    let submitted = await waitForTrustedOtpSubmission(debuggerApi, target, controlsExpression, ready.url, 2_500);
+    let submitMethod = 'button';
+    if (!submitted.submitted) {
+      submitMethod = 'enter-fallback';
+      const latest = submitted.state || ready;
+      if (latest.input) {
+        await debuggerClick(debuggerApi, target, latest.input.x, latest.input.y);
+      }
+      await debuggerPressEnter(debuggerApi, target);
+      submitted = await waitForTrustedOtpSubmission(debuggerApi, target, controlsExpression, ready.url, 3_500);
+    }
+    const data = trustedOtpDiagnostics(submitted.state || ready, submitMethod);
+    if (!submitted.submitted) {
+      return {
+        ok: false,
+        message: '验证码已输入，但按钮和 Enter 均未触发页面提交',
+        data,
+      };
+    }
+    return {
+      ok: true,
+      message: `已使用浏览器受信任事件提交验证码（${submitMethod === 'button' ? '按钮' : 'Enter 补交'}）`,
+      data,
+    };
+  } catch (error) {
+    return { ok: false, message: `验证码受信任输入失败：${error instanceof Error ? error.message : String(error)}` };
+  } finally {
+    if (attached) {
+      await debuggerApi.detach(target).catch(() => undefined);
+    }
+  }
+}
+
+async function trustedFillEmail(message: { tabId: number; email: string }): Promise<{ ok: boolean; message: string }> {
+  const debuggerApi = getNativeChromeApi().chrome?.debugger;
+  if (!debuggerApi) {
+    return { ok: false, message: '当前浏览器不支持受信任输入回退' };
+  }
+  const target = { tabId: message.tabId };
+  let attached = false;
+  try {
+    await debuggerApi.attach(target, '1.3');
+    attached = true;
+    const points = await locateTrustedFormControls(debuggerApi, target, `(() => {
+        const visible = (el) => {
+          if (!el) return false;
+          const rect = el.getBoundingClientRect();
+          const style = getComputedStyle(el);
+          return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+        };
+        const input = Array.from(document.querySelectorAll('input[type="email"], input[name="email"], input[autocomplete="email"]')).find(visible);
+        const buttons = Array.from(document.querySelectorAll('button')).filter(visible);
+        const button = buttons.find((el) => el.type === 'submit') || buttons.find((el) => /继续|continue/i.test(el.textContent || ''));
+        const point = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+        return { input: input ? point(input) : null, button: button ? point(button) : null };
+      })()`);
+    if (!points?.input || !points.button) {
+      return { ok: false, message: '受信任输入回退没有找到邮箱框或继续按钮' };
+    }
+    await debuggerClick(debuggerApi, target, points.input.x, points.input.y);
+    await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+      type: 'keyDown', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2,
+    });
+    await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+      type: 'keyUp', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2,
+    });
+    await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+      type: 'keyDown', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8,
+    });
+    await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+      type: 'keyUp', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8,
+    });
+    await debuggerApi.sendCommand(target, 'Input.insertText', { text: message.email });
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 180));
+    await debuggerClick(debuggerApi, target, points.button.x, points.button.y);
+    return { ok: true, message: '已使用浏览器受信任事件重新提交邮箱' };
+  } catch (error) {
+    return { ok: false, message: `受信任输入回退失败：${error instanceof Error ? error.message : String(error)}` };
+  } finally {
+    if (attached) {
+      await debuggerApi.detach(target).catch(() => undefined);
+    }
+  }
+}
+
+async function debuggerClick(
+  debuggerApi: NativeDebuggerApi,
+  target: NativeDebuggerTarget,
+  x: number,
+  y: number,
+): Promise<void> {
+  await debuggerApi.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+  await debuggerApi.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+  await debuggerApi.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+}
+
+async function debuggerTypeText(
+  debuggerApi: NativeDebuggerApi,
+  target: NativeDebuggerTarget,
+  text: string,
+): Promise<void> {
+  for (const char of text) {
+    const upper = char.toUpperCase();
+    const isDigit = /[0-9]/.test(char);
+    const code = isDigit ? `Digit${char}` : `Key${upper}`;
+    const windowsVirtualKeyCode = char.charCodeAt(0);
+    await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+      type: 'keyDown',
+      key: char,
+      code,
+      text: char,
+      unmodifiedText: char,
+      windowsVirtualKeyCode,
+    });
+    await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      key: char,
+      code,
+      windowsVirtualKeyCode,
+    });
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 45));
+  }
+}
+
+async function debuggerPressEnter(
+  debuggerApi: NativeDebuggerApi,
+  target: NativeDebuggerTarget,
+): Promise<void> {
+  await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+    type: 'keyDown',
+    key: 'Enter',
+    code: 'Enter',
+    text: '\r',
+    unmodifiedText: '\r',
+    windowsVirtualKeyCode: 13,
+  });
+  await debuggerApi.sendCommand(target, 'Input.dispatchKeyEvent', {
+    type: 'keyUp',
+    key: 'Enter',
+    code: 'Enter',
+    windowsVirtualKeyCode: 13,
+  });
+}
+
+type TrustedFormControls = {
+  input?: { x: number; y: number } | null;
+  button?: { x: number; y: number } | null;
+  values?: string[];
+  combinedValue?: string;
+  buttonDisabled?: boolean;
+  buttonAriaDisabled?: boolean;
+  buttonBusy?: boolean;
+  buttonText?: string;
+  url?: string;
+  pathname?: string;
+  errorText?: string;
+};
+
+async function evaluateTrustedFormControls(
+  debuggerApi: NativeDebuggerApi,
+  target: NativeDebuggerTarget,
+  expression: string,
+): Promise<TrustedFormControls | null> {
+  try {
+    const located = await debuggerApi.sendCommand(target, 'Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+    }) as { result?: { value?: TrustedFormControls } };
+    return located.result?.value || null;
+  } catch {
+    // The execution context can be replaced while the auth page rerenders.
+    return null;
+  }
+}
+
+async function waitForTrustedOtpReady(
+  debuggerApi: NativeDebuggerApi,
+  target: NativeDebuggerTarget,
+  expression: string,
+  code: string,
+  timeoutMs: number,
+): Promise<TrustedFormControls | null> {
+  const deadline = Date.now() + timeoutMs;
+  let lastState: TrustedFormControls | null = null;
+  do {
+    lastState = await evaluateTrustedFormControls(debuggerApi, target, expression) || lastState;
+    const actual = String(lastState?.combinedValue || '').replace(/\s+/g, '');
+    const expected = String(code || '').replace(/\s+/g, '');
+    if (
+      lastState?.input &&
+      lastState.button &&
+      actual === expected &&
+      !lastState.buttonDisabled &&
+      !lastState.buttonAriaDisabled
+    ) {
+      return lastState;
+    }
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 120));
+  } while (Date.now() < deadline);
+  return lastState;
+}
+
+async function waitForTrustedOtpSubmission(
+  debuggerApi: NativeDebuggerApi,
+  target: NativeDebuggerTarget,
+  expression: string,
+  initialUrl: string | undefined,
+  timeoutMs: number,
+): Promise<{ submitted: boolean; state: TrustedFormControls | null }> {
+  const deadline = Date.now() + timeoutMs;
+  let lastState: TrustedFormControls | null = null;
+  do {
+    lastState = await evaluateTrustedFormControls(debuggerApi, target, expression) || lastState;
+    if (lastState) {
+      const advanced = Boolean(
+        lastState.url &&
+        (lastState.url !== initialUrl || !/email-verification/i.test(lastState.pathname || '')),
+      );
+      if (advanced || lastState.buttonBusy || Boolean(lastState.errorText)) {
+        return { submitted: true, state: lastState };
+      }
+    }
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 120));
+  } while (Date.now() < deadline);
+  return { submitted: false, state: lastState };
+}
+
+function trustedOtpDiagnostics(state: TrustedFormControls | null, submitMethod: string): Record<string, unknown> {
+  return {
+    submitMethod,
+    values: state?.values || [],
+    combinedValue: state?.combinedValue || '',
+    buttonDisabled: Boolean(state?.buttonDisabled),
+    buttonAriaDisabled: Boolean(state?.buttonAriaDisabled),
+    buttonBusy: Boolean(state?.buttonBusy),
+    buttonText: state?.buttonText || '',
+    url: state?.url || '',
+    errorText: state?.errorText || '',
+  };
+}
+
+async function locateTrustedFormControls(
+  debuggerApi: NativeDebuggerApi,
+  target: NativeDebuggerTarget,
+  expression: string,
+  timeoutMs = 15_000,
+): Promise<TrustedFormControls | null> {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    const controls = await evaluateTrustedFormControls(debuggerApi, target, expression);
+    if (controls?.input && controls.button) {
+      return controls;
+    }
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
+  } while (Date.now() < deadline);
+  return null;
+}
+
 async function waitForOutlookOtp(message: OutlookOtpMessage): Promise<OutlookOtpResponse> {
   const jobId = message.jobId || makeOutlookJobId();
   const startedAt = message.since ?? Date.now();
@@ -2862,6 +3694,67 @@ async function waitForOutlookOtp(message: OutlookOtpMessage): Promise<OutlookOtp
   const apiBase = normalizeApiBase(message.apiBase || DEFAULT_OUTLOOK_API_BASE);
   const aborter = new AbortController();
   outlookOtpAborters.set(jobId, aborter);
+  const e2eMailboxUrl = await loadE2eMailboxUrl();
+  if (e2eMailboxUrl) {
+    const ignored = new Set((message.ignoreCodes || []).map((code) => String(code || '').trim()).filter(Boolean));
+    try {
+      while (Date.now() <= deadline) {
+        if (aborter.signal.aborted) {
+          return { ok: false, canceled: true, message: '已停止 E2E 邮件验证码接收' };
+        }
+        const polled = await pollMailboxUrlOtp(e2eMailboxUrl, { signal: aborter.signal });
+        if (polled.ok && polled.code && !ignored.has(polled.code)) {
+          return { ok: true, code: polled.code, message: polled.message };
+        }
+        if (polled.fatal) {
+          return { ok: false, message: polled.message, failureKind: polled.failureKind };
+        }
+        await delay(Math.max(1000, intervalMs), aborter.signal);
+      }
+      return { ok: false, message: '等待 E2E 邮件验证码超时', failureKind: 'mail_not_arrived' };
+    } finally {
+      if (outlookOtpAborters.get(jobId) === aborter) outlookOtpAborters.delete(jobId);
+    }
+  }
+  // acica-first: poll by email via mail.acica.top (no nested job aborter)
+  const acicaSettings = normalizeAcicaMailboxSettings((message as { acica?: unknown }).acica || DEFAULT_ACICA_MAILBOX_SETTINGS);
+  const accountEmail = extractEmailFromAccountLine(message.accountLine);
+  const isTokenLine = String(message.accountLine || '').includes('----') || /---/.test(String(message.accountLine || ''));
+  const tryAcicaBeforeLocalOutlook = Boolean(acicaSettings.enabled && acicaSettings.preferAcicaOtp && accountEmail);
+  if (tryAcicaBeforeLocalOutlook) {
+    const ignored = new Set((message.ignoreCodes || []).map((code) => String(code || '').trim()).filter(Boolean));
+    let acicaLast: OutlookOtpResponse = { ok: false, message: 'Acica 尚未返回验证码' };
+    while (Date.now() <= deadline) {
+      if (aborter.signal.aborted) {
+        return { ok: false, canceled: true, message: '已停止邮箱验证码接收' };
+      }
+      const remainSec = Math.max(5, Math.min(acicaSettings.otpWaitSeconds, Math.ceil((deadline - Date.now()) / 1000)));
+      const polled = await pollAcicaOtp(accountEmail, acicaSettings, {
+        signal: aborter.signal,
+        waitSeconds: remainSec,
+        keyword: 'ChatGPT',
+        since: startedAt,
+      });
+      if (polled.ok && polled.code && !ignored.has(polled.code)) {
+        return { ok: true, code: polled.code, message: polled.message };
+      }
+      acicaLast = { ok: false, message: polled.message, failureKind: polled.failureKind };
+      if (polled.fatal) {
+        if (!isTokenLine) return acicaLast;
+        break;
+      }
+      // for plain email accounts, keep waiting on Acica until deadline
+      if (!isTokenLine) {
+        await delay(Math.max(1000, acicaSettings.otpPollIntervalSec * 1000), aborter.signal);
+        continue;
+      }
+      // token line: one/few acica attempts then fall back to local outlook API
+      break;
+    }
+    if (!isTokenLine) {
+      return acicaLast;
+    }
+  }
 
   try {
     while (Date.now() <= deadline) {
@@ -3165,6 +4058,39 @@ function isAutomationFinishCleanupMessage(message: unknown): message is Automati
   );
 }
 
+function isProxyApplyMessage(message: unknown): message is ProxyApplyRequest {
+  return Boolean(
+    message &&
+      typeof message === 'object' &&
+      (message as ProxyApplyRequest).type === 'opx:proxy-apply' &&
+      typeof (message as ProxyApplyRequest).stage === 'string',
+  );
+}
+
+function isProxyClearMessage(message: unknown): message is ProxyClearRequest {
+  return Boolean(
+    message &&
+      typeof message === 'object' &&
+      (message as ProxyClearRequest).type === 'opx:proxy-clear',
+  );
+}
+
+function isProxyStatusMessage(message: unknown): message is ProxyStatusRequest {
+  return Boolean(
+    message &&
+      typeof message === 'object' &&
+      (message as ProxyStatusRequest).type === 'opx:proxy-status',
+  );
+}
+
+function isProxySaveMessage(message: unknown): message is ProxySaveRequest {
+  return Boolean(
+    message &&
+      typeof message === 'object' &&
+      (message as ProxySaveRequest).type === 'opx:proxy-save',
+  );
+}
+
 async function fetchSmsRelay(url: string): Promise<SmsRelayFetchResponse> {
   let parsedUrl: URL;
   try {
@@ -3326,8 +4252,45 @@ interface OutlookFetchPayload {
 interface NativeChromeRoot {
   chrome?: {
     action?: NativeActionApi;
+    browserAction?: NativeActionApi;
     sidePanel?: NativeSidePanelApi;
+    sidebarAction?: NativeSidebarActionApi;
+    debugger?: NativeDebuggerApi;
   };
+  browser?: {
+    action?: NativeActionApi;
+    browserAction?: NativeActionApi;
+    sidePanel?: NativeSidePanelApi;
+    sidebarAction?: NativeSidebarActionApi;
+  };
+}
+
+async function loadE2eMailboxUrl(): Promise<string> {
+  const key = 'opx.e2e.mailboxUrl';
+  const data = await browser.storage.local.get(key);
+  return typeof data[key] === 'string' ? data[key].trim() : '';
+}
+
+function isProxyAutomationStageMessage(message: unknown): message is ProxyAutomationStageRequest {
+  if (!message || typeof message !== 'object') return false;
+  const request = message as ProxyAutomationStageRequest;
+  return request.type === 'opx:proxy-automation-stage'
+    && (request.stage === 'auth' || request.stage === 'checkout' || request.stage === 'billing')
+    && typeof request.cycleId === 'string';
+}
+
+interface NativeDebuggerTarget {
+  tabId: number;
+}
+
+interface NativeDebuggerApi {
+  attach(target: NativeDebuggerTarget, requiredVersion: string): Promise<void>;
+  detach(target: NativeDebuggerTarget): Promise<void>;
+  sendCommand(target: NativeDebuggerTarget, method: string, params?: Record<string, unknown>): Promise<unknown>;
+}
+
+interface NativeSidebarActionApi {
+  open?: () => Promise<void> | void;
 }
 
 interface NativeActionApi {
@@ -3349,4 +4312,112 @@ interface SidePanelOpenOptions {
 interface ChromeTab {
   id?: number;
   windowId?: number;
+}
+
+function installProbeAlarmListener(): void {
+  const alarms = (browser as typeof browser & {
+    alarms?: { onAlarm?: { addListener?: (cb: (alarm: { name: string }) => void) => void } };
+  }).alarms;
+  if (!alarms?.onAlarm?.addListener) {
+    console.debug('[OPX] alarms API unavailable, probe scheduler disabled');
+    return;
+  }
+  alarms.onAlarm.addListener((alarm) => {
+    void handleProbeAlarm(alarm.name);
+  });
+}
+
+function isProbeSaveAccountsMessage(message: unknown): message is ProbeSaveAccountsMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeSaveAccountsMessage).type === 'opx:probe-save-accounts');
+}
+function isProbeSyncCurrentSessionMessage(message: unknown): message is { type: 'opx:probe-sync-current-session' } {
+  return Boolean(message && typeof message === 'object' && (message as { type?: string }).type === 'opx:probe-sync-current-session');
+}
+function isProbeUpsertTaskMessage(message: unknown): message is ProbeUpsertTaskMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeUpsertTaskMessage).type === 'opx:probe-upsert-task' && (message as ProbeUpsertTaskMessage).task && typeof (message as ProbeUpsertTaskMessage).task === 'object');
+}
+function isProbeDeleteTaskMessage(message: unknown): message is ProbeDeleteTaskMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeDeleteTaskMessage).type === 'opx:probe-delete-task' && typeof (message as ProbeDeleteTaskMessage).taskId === 'string');
+}
+function isProbeControlMessage(message: unknown): message is ProbeControlMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeControlMessage).type === 'opx:probe-control' && typeof (message as ProbeControlMessage).action === 'string');
+}
+function isProbeClearHitsMessage(message: unknown): message is ProbeClearHitsMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeClearHitsMessage).type === 'opx:probe-clear-hits');
+}
+function isProbeHitDbQueryMessage(message: unknown): message is ProbeHitDbQueryMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeHitDbQueryMessage).type === 'opx:probe-hitdb-query');
+}
+function isProbeHitDbDeleteMessage(message: unknown): message is ProbeHitDbDeleteMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeHitDbDeleteMessage).type === 'opx:probe-hitdb-delete' && typeof (message as ProbeHitDbDeleteMessage).dbId === 'string');
+}
+function isProbeHitDbExportMessage(message: unknown): message is ProbeHitDbExportMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeHitDbExportMessage).type === 'opx:probe-hitdb-export');
+}
+
+function isProbeMethodsQueryMessage(message: unknown): message is ProbeMethodsQueryMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeMethodsQueryMessage).type === 'opx:probe-methods-query');
+}
+function isProbeMethodsExportMessage(message: unknown): message is ProbeMethodsExportMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeMethodsExportMessage).type === 'opx:probe-methods-export');
+}
+function isProbeMethodsClearMessage(message: unknown): message is ProbeMethodsClearMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeMethodsClearMessage).type === 'opx:probe-methods-clear');
+}
+function isProbeAccountReportMessage(message: unknown): message is ProbeAccountReportMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeAccountReportMessage).type === 'opx:probe-account-report');
+}
+function isProbeAccountActionMessage(message: unknown): message is ProbeAccountActionMessage {
+  return Boolean(
+    message && typeof message === 'object'
+    && (message as ProbeAccountActionMessage).type === 'opx:probe-account-action'
+    && ['enable', 'disable', 'delete'].includes(String((message as ProbeAccountActionMessage).action || ''))
+    && Array.isArray((message as ProbeAccountActionMessage).accountIds),
+  );
+}
+function isProbeFactorQueryMessage(message: unknown): message is ProbeFactorQueryMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeFactorQueryMessage).type === 'opx:probe-factor-query');
+}
+function isProbeFactorExportMessage(message: unknown): message is ProbeFactorExportMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeFactorExportMessage).type === 'opx:probe-factor-export');
+}
+function isProbeFactorClearMessage(message: unknown): message is ProbeFactorClearMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeFactorClearMessage).type === 'opx:probe-factor-clear');
+}
+function isProbeFactorImportMessage(message: unknown): message is ProbeFactorImportMessage {
+  return Boolean(
+    message && typeof message === 'object'
+    && (message as ProbeFactorImportMessage).type === 'opx:probe-factor-import'
+    && typeof (message as ProbeFactorImportMessage).text === 'string',
+  );
+}
+
+function isRunLogListMessage(message: unknown): message is RunLogListMessage {
+  return Boolean(message && typeof message === 'object' && (message as RunLogListMessage).type === 'opx:runlog-list');
+}
+function isRunLogAppendMessage(message: unknown): message is RunLogAppendMessage {
+  return Boolean(message && typeof message === 'object' && (message as RunLogAppendMessage).type === 'opx:runlog-append' && (message as RunLogAppendMessage).event && typeof (message as RunLogAppendMessage).event === 'object');
+}
+function isRunLogClearMessage(message: unknown): message is RunLogClearMessage {
+  return Boolean(message && typeof message === 'object' && (message as RunLogClearMessage).type === 'opx:runlog-clear');
+}
+function isRunLogExportMessage(message: unknown): message is RunLogExportMessage {
+  return Boolean(message && typeof message === 'object' && (message as RunLogExportMessage).type === 'opx:runlog-export');
+}
+function isProbeStateMessage(message: unknown): message is ProbeStateMessage {
+  return Boolean(message && typeof message === 'object' && (message as ProbeStateMessage).type === 'opx:probe-get-state');
+}
+
+
+function isProbeSmartStartMessage(message: unknown): message is { type: 'opx:probe-smart-start'; runHealthCheck?: boolean; startScheduled?: boolean; runOnce?: boolean } {
+  return Boolean(message && typeof message === 'object' && (message as { type?: string }).type === 'opx:probe-smart-start');
+}
+
+function isProbeImportSessionMessage(message: unknown): message is { type: 'opx:probe-import-session'; email?: string; chatgptAccountId?: string; tokenRaw: string; source?: 'session' | 'automation'; identitySnapshot?: CheckoutIdentitySnapshot } {
+  return Boolean(
+    message
+    && typeof message === 'object'
+    && (message as { type?: string }).type === 'opx:probe-import-session'
+    && typeof (message as { tokenRaw?: unknown }).tokenRaw === 'string',
+  );
 }

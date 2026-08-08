@@ -50,6 +50,7 @@ const AUTOMATION_STAGES: AutomationStageDefinition[] = [
     startStepId: 'read-chatgpt-session',
     stepIds: [
       'read-chatgpt-session',
+      'run-plus-checkout-closure',
       'create-checkout-link',
       'open-checkout-link',
       'submit-openai-checkout',
@@ -181,7 +182,7 @@ export function createAutomationPanel(container: HTMLElement): FeaturePanelHandl
   function render(state: AutomationState): void {
     const email = state.emails.find((item) => item.id === state.run.selectedEmailId);
     const sms = state.smsTargets.find((item) => item.id === state.run.selectedSmsId);
-    const visibleSteps = visibleAutomationSteps(state.settings.oauthExtractMode, state.settings.registrationMode);
+    const visibleSteps = visibleAutomationSteps(state.settings.oauthExtractMode, state.settings.registrationMode, state.settings.plusCheckoutClosure.enabled);
     const visibleIds = new Set(visibleSteps.map((step) => step.id));
     const successCount = state.steps.filter((step) => visibleIds.has(step.id) && step.status === 'success').length;
     const runningStep = state.steps.find((step) => visibleIds.has(step.id) && step.status === 'running');
@@ -203,7 +204,7 @@ export function createAutomationPanel(container: HTMLElement): FeaturePanelHandl
 
   function renderStages(state: AutomationState): void {
     stagesList.textContent = '';
-    const visibleDefinitions = visibleAutomationSteps(state.settings.oauthExtractMode, state.settings.registrationMode);
+    const visibleDefinitions = visibleAutomationSteps(state.settings.oauthExtractMode, state.settings.registrationMode, state.settings.plusCheckoutClosure.enabled);
     const visibleById = new Map(visibleDefinitions.map((definition) => [definition.id, definition]));
     const visibleOrder = new Map(visibleDefinitions.map((definition, index) => [definition.id, index]));
     for (const stage of AUTOMATION_STAGES) {

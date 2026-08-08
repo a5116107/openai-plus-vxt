@@ -50,6 +50,12 @@ export const AUTOMATION_STEPS: AutomationStepDefinition[] = [
     description: '读取 ChatGPT session 和 accessToken。',
   },
   {
+    id: 'run-plus-checkout-closure',
+    order: 75,
+    title: 'Plus 双 Checkout 闭环',
+    description: '创建 Checkout A、保存卡、创建独立 Checkout B、选择 Saved Card、填写账单并验证 Plus。',
+  },
+  {
     id: 'create-checkout-link',
     order: 80,
     title: '提取订阅链接',
@@ -137,6 +143,7 @@ const PHONE_REGISTRATION_STEP_ORDER: AutomationStepId[] = [
   'wait-register-email-code',
   'fill-profile',
   'read-chatgpt-session',
+  'run-plus-checkout-closure',
   'create-checkout-link',
   'open-checkout-link',
   'submit-openai-checkout',
@@ -211,8 +218,16 @@ export function getDisplayStepDefinition(
 export function visibleAutomationSteps(
   mode: AutomationOAuthExtractMode,
   registrationMode: AutomationRegistrationMode = 'email',
+  plusCheckoutClosureEnabled = false,
 ): AutomationStepDefinition[] {
   const display = (steps: AutomationStepDefinition[]) => steps.map((step) => getDisplayStepDefinition(step, registrationMode));
+  const legacyPaymentSteps = new Set<AutomationStepId>([
+    'create-checkout-link', 'open-checkout-link', 'submit-openai-checkout', 'open-paypal-account',
+    'fill-paypal-email', 'select-sms', 'fill-payment-profile', 'wait-payment-sms',
+  ]);
+  const flowSteps = AUTOMATION_STEPS.filter((step) => plusCheckoutClosureEnabled
+    ? !legacyPaymentSteps.has(step.id)
+    : step.id !== 'run-plus-checkout-closure');
   if (mode === 'direct' || registrationMode === 'phone') {
     const hidden = new Set<AutomationStepId>([
       'create-oauth-session',
@@ -220,22 +235,23 @@ export function visibleAutomationSteps(
       'wait-oauth-email-code',
       'export-oauth-files',
     ]);
-    const steps = AUTOMATION_STEPS.filter((step) => !hidden.has(step.id));
+    const steps = flowSteps.filter((step) => !hidden.has(step.id));
     if (registrationMode === 'phone') {
       const byId = new Map(steps.map((step) => [step.id, step]));
       return display(PHONE_REGISTRATION_STEP_ORDER.map((id) => byId.get(id)).filter((step): step is AutomationStepDefinition => Boolean(step)));
     }
     return display(steps);
   }
-  return display(AUTOMATION_STEPS.filter((step) => step.id !== 'generate-direct-files'));
+  return display(flowSteps.filter((step) => step.id !== 'generate-direct-files'));
 }
 
 export function nextVisibleAutomationStepId(
   id: AutomationStepId | '',
   mode: AutomationOAuthExtractMode,
   registrationMode: AutomationRegistrationMode = 'email',
+  plusCheckoutClosureEnabled = false,
 ): AutomationStepId | '' {
-  const steps = visibleAutomationSteps(mode, registrationMode);
+  const steps = visibleAutomationSteps(mode, registrationMode, plusCheckoutClosureEnabled);
   if (!id) {
     return steps[0]?.id || '';
   }

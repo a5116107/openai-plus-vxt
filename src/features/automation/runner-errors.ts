@@ -130,10 +130,30 @@ function isProfileSubmitUnavailableFailure(stepId: AutomationStepId, result: Act
   if (stepId !== 'fill-profile') {
     return false;
   }
+  if (isRecord(result.data) && result.data.profileCreateRejected === true) {
+    return true;
+  }
   if (isRecord(result.data) && result.data.retryableAboutYouError === true) {
     return true;
   }
-  return isRetryableAboutYouTimeout(result);
+  const text = resultText(result);
+  return isRetryableAboutYouTimeout(result) ||
+    isAboutYouRegistrationDisallowed(result) ||
+    text.includes('user_already_exists') ||
+    text.includes('an account already exists for this email address') ||
+    text.includes('资料页创建请求返回 http');
+}
+
+export function isAboutYouRegistrationDisallowed(result: ActionResult): boolean {
+  if (isRecord(result.data) && result.data.registrationDisallowed === true) {
+    return true;
+  }
+  const text = resultText(result);
+  return text.includes('registration_disallowed') ||
+    text.includes('cannot create your account with the given information') ||
+    text.includes('无法创建你的账户') ||
+    text.includes('无法创建您的账户') ||
+    text.includes('资料页拒绝创建');
 }
 
 function isOpenAiCheckoutPaypalUnavailableFailure(stepId: AutomationStepId, result: ActionResult): boolean {
@@ -247,6 +267,12 @@ export function isEmailOtpIncorrectResult(result: ActionResult | null): result i
     message.includes('incorrect code') ||
     message.includes('invalid code') ||
     message.includes('wrong code');
+}
+
+export function isAuthCloudflareChallengeResult(result: ActionResult | null): result is ActionResult {
+  if (!result || result.ok) return false;
+  if (result.code === 'AUTH_CF_CHALLENGE') return true;
+  return isRecord(result.data) && result.data.authCloudflareChallenge === true;
 }
 
 export function isPaymentProfileComplete(result: ActionResult): boolean {

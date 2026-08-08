@@ -1,4 +1,4 @@
-export type FeatureTab = 'register' | 'automation' | 'link' | 'oauth' | 'address' | 'sms' | 'settings';
+export type FeatureTab = 'register' | 'automation' | 'link' | 'payment' | 'oauth' | 'address' | 'sms' | 'settings';
 
 export interface ActionResult {
   ok: boolean;

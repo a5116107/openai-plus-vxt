@@ -1,0 +1,41 @@
+{
+  "at": "2026-07-28T15:22:00.754Z",
+  "checks": [
+    {
+      "id": "T-P2-01",
+      "pass": true,
+      "evidence": "stripe init detector + ignore card/paypal/link"
+    },
+    {
+      "id": "T-P2-02",
+      "pass": true,
+      "evidence": "seed cooldown/remove + pool filter + outcome recording"
+    },
+    {
+      "id": "T-P2-03",
+      "pass": true,
+      "evidence": "probe/UI wiring"
+    },
+    {
+      "id": "T-P2-02-runtime-remove-fresh",
+      "pass": true,
+      "evidence": "fresh seed removes after 1 fail"
+    },
+    {
+      "id": "T-P2-02-runtime-reused-threshold",
+      "pass": true,
+      "evidence": "reused seed not removed before 3 fails"
+    },
+    {
+      "id": "T-P2-02-runtime-reused-remove",
+      "pass": true,
+      "evidence": "reused seed removed at 3 fails"
+    },
+    {
+      "id": "T-P2-01-runtime-extract",
+      "pass": true,
+      "evidence": "extract filters ignored methods"
+    }
+  ],
+  "allPass": true
+}

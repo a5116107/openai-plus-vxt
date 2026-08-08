@@ -14,6 +14,7 @@ import {
   shortUrl,
 } from './runner-format';
 import { isRetryableAboutYouReadyFailure } from './runner-errors';
+import { isAboutYouRegistrationDisallowed } from './runner-errors';
 import {
   isAboutYouUrl,
   isAfterEmailVerificationUrl,
@@ -157,6 +158,9 @@ async function waitForAboutYouSubmitProgress(
     if (parsed && isAboutYouUrl(parsed)) {
       const ready = await checkRegisterPageReadyNow('profile', tabId);
       last = ready;
+      if (isAboutYouRegistrationDisallowed(ready)) {
+        return ready;
+      }
       if (isRetryableAboutYouReadyFailure(ready)) {
         return {
           ok: false,

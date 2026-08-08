@@ -1,0 +1,31 @@
+{
+  "at": "2026-07-28T23:34:21Z",
+  "checks": [
+    {
+      "id": "UX-01-methods-board-data",
+      "pass": true,
+      "evidence": "detection storage + country aggregation + UI board"
+    },
+    {
+      "id": "UX-02-seed-export",
+      "pass": true,
+      "evidence": "seed health csv/json export wired in UI"
+    },
+    {
+      "id": "UX-03-recommend-supported-only",
+      "pass": true,
+      "evidence": "recommendations use detected supported methods only"
+    },
+    {
+      "id": "UX-04-messages",
+      "pass": true,
+      "evidence": "background messages for methods board/export"
+    },
+    {
+      "id": "UX-03-runtime",
+      "pass": true,
+      "evidence": "recs=[('NL', 'ideal', ['ideal']), ('IN', 'upi', ['upi'])]"
+    }
+  ],
+  "allPass": true
+}

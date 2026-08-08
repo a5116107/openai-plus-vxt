@@ -2,7 +2,7 @@
   "name": "openai-plus-vxt",
   "description": "ChatGPT registration assistant extension",
   "private": true,
-  "version": "0.0.8",
+  "version": "0.0.37",
   "type": "module",
   "scripts": {
     "dev": "wxt -b chrome",
@@ -12,10 +12,26 @@
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
+    "package:saved-payment": "node scripts/package-saved-payment-release.mjs",
     "compile": "tsc --noEmit",
+    "test:payment-runner": "tsx --test tests/payment-runner.test.ts",
+    "test:probe-readiness": "tsx --test tests/probe-readiness.test.ts",
+    "test:checkout-pipeline": "tsx --test tests/checkout-pipeline.test.ts",
+    "test:auth-cf": "tsx --test tests/auth-cf-recovery.test.ts",
+    "test:hosted-resolution": "tsx --test tests/hosted-resolution.test.ts",
+    "test:saved-payment-methods": "tsx --test tests/saved-payment-methods.test.ts",
+    "test:saved-payment-backend": "node --test tests/saved-payment-test-backend.test.mjs",
+    "test:e2e-auth-exit": "node scripts/e2e-auth-exit-rotation.mjs",
+    "test:e2e-saved-payment": "node scripts/e2e-saved-payment-live.mjs",
+    "test:e2e-saved-payment:check": "node scripts/e2e-saved-payment-live.mjs --check",
+    "test:e2e-saved-payment:profile": "node scripts/e2e-saved-payment-live.mjs --probe-profile",
+    "test:e2e-plus-closure": "node scripts/e2e-plus-checkout-closure-fixture.mjs",
+    "test:e2e-plus-closure:live": "tsx scripts/e2e-plus-checkout-closure-live.ts",
+    "test:e2e-plus-closure:seal": "tsx scripts/e2e-plus-checkout-closure-live.ts --seal-existing",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {
+    "tsx": "^4.23.1",
     "typescript": "^5.9.3",
     "wxt": "^0.20.26"
   }

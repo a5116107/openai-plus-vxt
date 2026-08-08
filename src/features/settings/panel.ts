@@ -66,6 +66,12 @@ export function createSettingsPanel(container: HTMLElement, options: SettingsPan
   cookieHint.textContent = '用于快速退出相关站点登录态。只清除对应域名下的浏览器 cookie。';
   cookieSection.append(cookieTitle, cookieActions, cookieHint);
 
+  const openProxySettingsButton = document.createElement('button');
+  openProxySettingsButton.className = 'opx-external-link-button';
+  openProxySettingsButton.type = 'button';
+  openProxySettingsButton.title = '打开三段代理 / 撞资格探测 / 命中库看板';
+  openProxySettingsButton.textContent = '打开代理与撞资格设置';
+
   const checkUpdateButton = document.createElement('button');
   checkUpdateButton.className = 'opx-external-link-button';
   checkUpdateButton.type = 'button';
@@ -81,7 +87,7 @@ export function createSettingsPanel(container: HTMLElement, options: SettingsPan
   const status = document.createElement('div');
   status.className = 'opx-status';
 
-  dialog.append(header, payOpenAiItem, payPalSignupItem, cookieSection, checkUpdateButton, tgGroupButton, status);
+  dialog.append(header, payOpenAiItem, payPalSignupItem, cookieSection, openProxySettingsButton, checkUpdateButton, tgGroupButton, status);
   container.append(dialog);
 
   payOpenAiCheckbox.addEventListener('change', async () => {
@@ -91,6 +97,28 @@ export function createSettingsPanel(container: HTMLElement, options: SettingsPan
   payPalSignupCheckbox.addEventListener('change', async () => {
     await saveAddressAutofillSettings({ payPalSignupEnabled: payPalSignupCheckbox.checked });
     setStatus(status, '设置已保存', 'ok');
+  });
+  openProxySettingsButton.addEventListener('click', () => {
+    void (async () => {
+      const restore = setButtonPending(openProxySettingsButton, '打开中...');
+      try {
+        const url = browser.runtime.getURL('/automation-settings.html');
+        await browser.tabs.create({ url, active: true });
+        setStatus(status, '已打开代理 / 撞资格设置页', 'ok');
+        flashButtonLabel(openProxySettingsButton, '已打开');
+      } catch (error) {
+        // fallback for environments without tabs.create from sidepanel
+        try {
+          const url = browser.runtime.getURL('/automation-settings.html');
+          window.open(url, '_blank', 'noopener,noreferrer');
+          setStatus(status, '已打开代理 / 撞资格设置页', 'ok');
+        } catch (innerError) {
+          setStatus(status, error instanceof Error ? error.message : String(error), 'error');
+        }
+      } finally {
+        restore();
+      }
+    })();
   });
   tgGroupButton.addEventListener('click', () => {
     window.open(TG_GROUP_URL, '_blank', 'noopener,noreferrer');

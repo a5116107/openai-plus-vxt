@@ -32,12 +32,13 @@ export async function ensureSelectedEmail(): Promise<AutomationEmailAccount> {
 }
 
 export async function writeRegisterStateFromEmail(email: AutomationEmailAccount): Promise<AutomationEmailAccount> {
+  const tokenLine = email.rawInput.includes('----') || /---/.test(email.rawInput);
   await saveRegisterState({
-    rawInput: email.rawInput,
+    rawInput: email.rawInput || email.email,
     email: email.email,
-    accountLine: email.rawInput.includes('----') ? email.rawInput : '',
-    inputMode: email.rawInput.includes('----') ? 'outlook-line' : 'email',
-    autoOtp: email.rawInput.includes('----'),
+    accountLine: tokenLine ? email.rawInput : email.email,
+    inputMode: tokenLine ? 'outlook-line' : 'email',
+    autoOtp: true, // Acica 可按邮箱取件；token 行也可本地 OTP
   });
   return email;
 }
@@ -52,9 +53,44 @@ export function selectEmail(state: AutomationState): AutomationEmailAccount | nu
       return selected;
     }
   }
-  return [...state.emails]
-    .filter((email) => email.status !== 'used' && email.status !== 'error')
+  const available = state.emails.filter((email) => email.status !== 'used' && email.status !== 'error');
+  if (!available.length) {
+    return null;
+  }
+  if (state.settings.emailSelectionMode === 'random') {
+    const candidates = healthiestRandomEmailCandidates(state, available);
+    return candidates[Math.floor(Math.random() * candidates.length)] || candidates[0] || available[0];
+  }
+  return [...available]
     .sort((left, right) => left.lastUsedAt - right.lastUsedAt || left.useCount - right.useCount)[0] || null;
+}
+
+function healthiestRandomEmailCandidates(
+  state: AutomationState,
+  available: AutomationEmailAccount[],
+): AutomationEmailAccount[] {
+  const domainStats = new Map<string, { total: number; errors: number }>();
+  for (const email of state.emails) {
+    const domain = emailDomain(email.email);
+    if (!domain) continue;
+    const current = domainStats.get(domain) || { total: 0, errors: 0 };
+    current.total += 1;
+    if (email.status === 'error') current.errors += 1;
+    domainStats.set(domain, current);
+  }
+  const rates = available.map((email) => {
+    const stats = domainStats.get(emailDomain(email.email)) || { total: 1, errors: 0 };
+    return stats.errors / Math.max(1, stats.total);
+  });
+  const bestRate = Math.min(...rates);
+  return available.filter((email) => {
+    const stats = domainStats.get(emailDomain(email.email)) || { total: 1, errors: 0 };
+    return stats.errors / Math.max(1, stats.total) === bestRate;
+  });
+}
+
+function emailDomain(email: string): string {
+  return String(email || '').trim().toLowerCase().split('@')[1] || '';
 }
 
 export function selectSmsTarget(state: AutomationState): AutomationSmsTarget | null {
@@ -114,6 +150,16 @@ export async function markSelectedEmailError(message: string): Promise<void> {
   }
   await updateAutomationEmails(state.emails.map((email) => email.id === state.run.selectedEmailId
     ? { ...email, status: 'error', lastMessage: message }
+    : email));
+}
+
+export async function recordSelectedEmailMessage(message: string): Promise<void> {
+  const state = await loadAutomationState();
+  if (!state.run.selectedEmailId) {
+    return;
+  }
+  await updateAutomationEmails(state.emails.map((email) => email.id === state.run.selectedEmailId
+    ? { ...email, lastMessage: message }
     : email));
 }
 

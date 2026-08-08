@@ -101,6 +101,7 @@ export async function resetAutomationProgress(): Promise<AutomationState> {
       targetWindowId: 0,
       startedAt: 0,
       finishedAt: 0,
+      plusCheckoutClosure: undefined,
     },
   });
 }

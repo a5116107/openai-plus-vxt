@@ -543,34 +543,14 @@ function clickElement(element: HTMLElement): void {
 function submitCreateButton(button: HTMLButtonElement): Record<string, unknown> {
   const form = button.form || button.closest<HTMLFormElement>('form');
   const before = buttonDebug(button, form);
-  clickElement(button);
-  let requestedSubmit = false;
-  let directSubmit = false;
-
-  if (form) {
-    try {
-      form.requestSubmit(button);
-      requestedSubmit = true;
-    } catch {
-      try {
-        form.requestSubmit();
-        requestedSubmit = true;
-      } catch {
-        try {
-          form.submit();
-          directSubmit = true;
-        } catch {
-          // Keep the click result; diagnostics below show that form submit fallback failed.
-        }
-      }
-    }
-  }
+  button.scrollIntoView({ block: 'center', inline: 'center' });
+  button.focus({ preventScroll: true });
+  button.click();
 
   return {
     before,
     after: buttonDebug(button, form),
-    requestedSubmit,
-    directSubmit,
+    submitMethod: 'button.click',
   };
 }
 

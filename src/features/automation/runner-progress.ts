@@ -2,7 +2,7 @@ import { AUTOMATION_STEPS, getDisplayStepDefinition, nextVisibleAutomationStepId
 import type { AutomationState, AutomationStepId } from './types';
 
 export function nextPendingStepId(state: AutomationState): AutomationStepId | '' {
-  for (const definition of visibleAutomationSteps(state.settings.oauthExtractMode, state.settings.registrationMode)) {
+  for (const definition of visibleAutomationSteps(state.settings.oauthExtractMode, state.settings.registrationMode, state.settings.plusCheckoutClosure.enabled)) {
     const record = state.steps.find((step) => step.id === definition.id);
     if (record?.status === 'pending' || record?.status === 'error') {
       return definition.id;
@@ -12,7 +12,7 @@ export function nextPendingStepId(state: AutomationState): AutomationStepId | ''
 }
 
 export function resumeStepId(state: AutomationState): AutomationStepId | '' {
-  const visibleSteps = visibleAutomationSteps(state.settings.oauthExtractMode, state.settings.registrationMode);
+  const visibleSteps = visibleAutomationSteps(state.settings.oauthExtractMode, state.settings.registrationMode, state.settings.plusCheckoutClosure.enabled);
   const visibleIds = new Set(visibleSteps.map((step) => step.id));
   const cleanup = state.steps.find((step) => step.id === 'cleanup-environment');
   if (cleanup?.status === 'pending' || cleanup?.status === 'error') {
@@ -29,7 +29,7 @@ export function resumeStepId(state: AutomationState): AutomationStepId | '' {
     .reverse()
     .find((definition) => state.steps.find((step) => step.id === definition.id)?.status === 'success');
   if (successful) {
-    const next = nextVisibleAutomationStepId(successful.id, state.settings.oauthExtractMode, state.settings.registrationMode);
+    const next = nextVisibleAutomationStepId(successful.id, state.settings.oauthExtractMode, state.settings.registrationMode, state.settings.plusCheckoutClosure.enabled);
     if (next) {
       return next;
     }
@@ -41,11 +41,11 @@ export function resolveAutomationStartStep(state: AutomationState, requestedStep
   if (requestedStepId) {
     const requested = state.steps.find((step) => step.id === requestedStepId);
     if (requested?.status === 'success') {
-      return nextVisibleAutomationStepId(requestedStepId, state.settings.oauthExtractMode, state.settings.registrationMode) || nextPendingStepId(state);
+      return nextVisibleAutomationStepId(requestedStepId, state.settings.oauthExtractMode, state.settings.registrationMode, state.settings.plusCheckoutClosure.enabled) || nextPendingStepId(state);
     }
     return requestedStepId;
   }
-  return resumeStepId(state) || visibleAutomationSteps(state.settings.oauthExtractMode, state.settings.registrationMode)[0]?.id || AUTOMATION_STEPS[0]?.id || '';
+  return resumeStepId(state) || visibleAutomationSteps(state.settings.oauthExtractMode, state.settings.registrationMode, state.settings.plusCheckoutClosure.enabled)[0]?.id || AUTOMATION_STEPS[0]?.id || '';
 }
 
 export function stepTitle(stepId: AutomationStepId | '', state?: AutomationState): string {

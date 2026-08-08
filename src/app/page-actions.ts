@@ -11,6 +11,10 @@ export const PAGE_ACTION = {
   fillCurrentPaymentAddress: 'opx:fill-current-payment-address',
   paymentCheckReady: 'opx:payment-check-ready',
   openAiSubmitCheckout: 'opx:openai-submit-checkout',
+  openAiSelectSavedCard: 'opx:openai-select-saved-card',
+  openAiFillBilling: 'opx:openai-fill-billing',
+  openAiVerifyBilling: 'opx:openai-verify-billing',
+  openAiSubmitQualifiedCheckout: 'opx:openai-submit-qualified-checkout',
   paypalOpenAccount: 'opx:paypal-open-account',
   paypalFillEmail: 'opx:paypal-fill-email',
   paypalClickBillingConsent: 'opx:paypal-click-billing-consent',
@@ -73,6 +77,30 @@ export interface OpenAiSubmitCheckoutAction {
   address: AddressProfile;
 }
 
+export interface OpenAiSelectSavedCardAction {
+  type: typeof PAGE_ACTION.openAiSelectSavedCard;
+  expectedLast4: string;
+}
+
+export interface OpenAiFillBillingAction {
+  type: typeof PAGE_ACTION.openAiFillBilling;
+  address: AddressProfile;
+}
+
+export interface OpenAiVerifyBillingAction {
+  type: typeof PAGE_ACTION.openAiVerifyBilling;
+  address: AddressProfile;
+}
+
+export interface OpenAiSubmitQualifiedCheckoutAction {
+  type: typeof PAGE_ACTION.openAiSubmitQualifiedCheckout;
+  expectedLast4: string;
+  billingCountry: string;
+  selectionVerified: boolean;
+  billingVerified: boolean;
+  submitKey: string;
+}
+
 export interface PaypalOpenAccountAction {
   type: typeof PAGE_ACTION.paypalOpenAccount;
 }
@@ -131,6 +159,10 @@ export type PageActionMessage =
   | FillCurrentPaymentAddressAction
   | PaymentCheckReadyAction
   | OpenAiSubmitCheckoutAction
+  | OpenAiSelectSavedCardAction
+  | OpenAiFillBillingAction
+  | OpenAiVerifyBillingAction
+  | OpenAiSubmitQualifiedCheckoutAction
   | PaypalOpenAccountAction
   | PaypalFillEmailAction
   | PaypalClickBillingConsentAction
@@ -185,8 +217,38 @@ export function isOpenAiSubmitCheckoutAction(message: unknown): message is OpenA
   );
 }
 
+export function isOpenAiSelectSavedCardAction(message: unknown): message is OpenAiSelectSavedCardAction {
+  return Boolean(isRecord(message) && hasOnlyKeys(message, ['type', 'expectedLast4']) && message.type === PAGE_ACTION.openAiSelectSavedCard && /^\d{4}$/.test(String(message.expectedLast4 || '')));
+}
+
+export function isOpenAiFillBillingAction(message: unknown): message is OpenAiFillBillingAction {
+  return Boolean(isRecord(message) && hasOnlyKeys(message, ['type', 'address']) && message.type === PAGE_ACTION.openAiFillBilling && isAddressProfile(message.address));
+}
+
+export function isOpenAiVerifyBillingAction(message: unknown): message is OpenAiVerifyBillingAction {
+  return Boolean(isRecord(message) && hasOnlyKeys(message, ['type', 'address']) && message.type === PAGE_ACTION.openAiVerifyBilling && isAddressProfile(message.address));
+}
+
+export function isOpenAiSubmitQualifiedCheckoutAction(message: unknown): message is OpenAiSubmitQualifiedCheckoutAction {
+  return Boolean(
+    isRecord(message) &&
+      hasOnlyKeys(message, ['type', 'expectedLast4', 'billingCountry', 'selectionVerified', 'billingVerified', 'submitKey']) &&
+      message.type === PAGE_ACTION.openAiSubmitQualifiedCheckout &&
+      /^\d{4}$/.test(String(message.expectedLast4 || '')) &&
+      /^[A-Z]{2}$/.test(String(message.billingCountry || '')) &&
+      typeof message.selectionVerified === 'boolean' &&
+      typeof message.billingVerified === 'boolean' &&
+      /^[A-Za-z0-9_.:-]{1,160}$/.test(String(message.submitKey || '')),
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object');
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowed: string[]): boolean {
+  const keys = new Set(allowed);
+  return Object.keys(value).every((key) => keys.has(key));
 }
 
 function isAddressProfile(value: unknown): value is AddressProfile {

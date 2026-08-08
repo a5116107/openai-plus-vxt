@@ -1,16 +1,17 @@
 import { loadLinkExtractorState, saveLinkExtractorState } from '../../app/state';
 import type { CheckoutLinkResponse, ChatGptSessionResponse } from './types';
 
-export async function readCurrentChatGptSession(): Promise<ChatGptSessionResponse> {
+export async function readCurrentChatGptSession(tabId?: number): Promise<ChatGptSessionResponse> {
   return await browser.runtime.sendMessage({
     type: 'opx:fetch-chatgpt-session',
+    ...(typeof tabId === 'number' ? { tabId } : {}),
   });
 }
 
-export async function createCheckoutLinkFromCurrentSession(): Promise<CheckoutLinkResponse> {
+export async function createCheckoutLinkFromCurrentSession(tabId?: number): Promise<CheckoutLinkResponse> {
   const [settings, sessionResponse] = await Promise.all([
     loadLinkExtractorState(),
-    readCurrentChatGptSession(),
+    readCurrentChatGptSession(tabId),
   ]);
 
   if (!sessionResponse.ok || !sessionResponse.session?.accessToken) {

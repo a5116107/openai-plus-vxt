@@ -2,6 +2,7 @@ import { createAddressPanel } from '../features/address-autofill/panel';
 import { createAutomationPanel } from '../features/automation/panel';
 import { createLinkExtractorPanel } from '../features/link-extractor/panel';
 import { createOAuthPanel } from '../features/oauth/panel';
+import { createPaymentPanel } from '../features/payment/panel';
 import { createRegisterPanel } from '../features/register/panel';
 import type { RegisterController } from '../features/register/types';
 import { createSettingsPanel } from '../features/settings/panel';
@@ -14,7 +15,7 @@ import { PANEL_STYLES } from './styles';
 import { installToastHost } from './toast';
 import type { FeaturePanelHandle, FeatureTab } from './types';
 
-const CHATGPT_REGISTER_URL = 'https://chatgpt.com/auth/login';
+const CHATGPT_REGISTER_URL = 'https://chatgpt.com/auth/login?screen_hint=signup';
 const OTP_SERVICE_DOWNLOAD_URL =
   'https://github.com/suyancc/openai-plus-vxt/releases/download/outlook-otp-service/outlook-otp-service.zip';
 
@@ -52,11 +53,12 @@ export function createPanel(root: ShadowRoot, registerController: RegisterContro
   const registerTab = createTab('register', '注册');
   const automationTab = createTab('automation', '自动化');
   const linkTab = createTab('link', '提链接');
+  const paymentTab = createTab('payment', '支付');
   const oauthTab = createTab('oauth', 'OAuth');
   const addressTab = createTab('address', '地址');
   const smsTab = createTab('sms', '接码');
   const settingsTab = createTab('settings', '设置');
-  tabs.append(registerTab, automationTab, linkTab, oauthTab, addressTab, smsTab, settingsTab);
+  tabs.append(registerTab, automationTab, linkTab, paymentTab, oauthTab, addressTab, smsTab, settingsTab);
 
   const state = document.createElement('div');
   state.className = 'opx-state';
@@ -84,6 +86,7 @@ export function createPanel(root: ShadowRoot, registerController: RegisterContro
   const registerView = createView();
   const automationView = createView();
   const linkView = createView();
+  const paymentView = createView();
   const oauthView = createView();
   const addressView = createView();
   const smsView = createView();
@@ -94,6 +97,7 @@ export function createPanel(root: ShadowRoot, registerController: RegisterContro
     register: createRegisterPanel(registerView, registerController),
     automation: createAutomationPanel(automationView),
     link: createLinkExtractorPanel(linkView),
+    payment: createPaymentPanel(paymentView),
     oauth: createOAuthPanel(oauthView),
     address: createAddressPanel(addressView),
     sms: createSmsPanel(smsView),
@@ -125,12 +129,13 @@ export function createPanel(root: ShadowRoot, registerController: RegisterContro
   };
 
   const renderActiveTab = () => {
-    for (const item of [registerTab, automationTab, linkTab, oauthTab, addressTab, smsTab, settingsTab]) {
+    for (const item of [registerTab, automationTab, linkTab, paymentTab, oauthTab, addressTab, smsTab, settingsTab]) {
       item.classList.toggle('is-active', item.dataset.tab === activeTab);
     }
     registerView.hidden = activeTab !== 'register';
     automationView.hidden = activeTab !== 'automation';
     linkView.hidden = activeTab !== 'link';
+    paymentView.hidden = activeTab !== 'payment';
     oauthView.hidden = activeTab !== 'oauth';
     addressView.hidden = activeTab !== 'address';
     smsView.hidden = activeTab !== 'sms';
@@ -157,6 +162,7 @@ export function createPanel(root: ShadowRoot, registerController: RegisterContro
   registerTab.addEventListener('click', () => void setActiveTab('register'));
   automationTab.addEventListener('click', () => void setActiveTab('automation'));
   linkTab.addEventListener('click', () => void setActiveTab('link'));
+  paymentTab.addEventListener('click', () => void setActiveTab('payment'));
   oauthTab.addEventListener('click', () => void setActiveTab('oauth'));
   addressTab.addEventListener('click', () => void setActiveTab('address'));
   smsTab.addEventListener('click', () => void setActiveTab('sms'));
@@ -184,7 +190,7 @@ export function createPanel(root: ShadowRoot, registerController: RegisterContro
   });
 
   topbar.append(tabs);
-  panel.append(topbar, versionNotice.element, stateRow, registerView, automationView, linkView, oauthView, addressView, smsView, settingsView);
+  panel.append(topbar, versionNotice.element, stateRow, registerView, automationView, linkView, paymentView, oauthView, addressView, smsView, settingsView);
   shell.append(collapseButton, panel);
   root.append(style, shell);
   installToastHost(root);
@@ -222,6 +228,9 @@ function getStateLabel(activeTab: FeatureTab, registerController: RegisterContro
   }
   if (activeTab === 'automation') {
     return '自动化：流程编排';
+  }
+  if (activeTab === 'payment') {
+    return '支付：保存方式';
   }
   if (activeTab === 'oauth') {
     return 'OAuth：授权码导出';

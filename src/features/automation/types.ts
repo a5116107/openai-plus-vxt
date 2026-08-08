@@ -1,4 +1,9 @@
+import type { AcicaMailboxSettings } from '../mailbox/acica';
 import type { CheckoutExtractMode, CheckoutOptions } from '../link-extractor/types';
+import type {
+  PlusCheckoutClosureRun,
+  PlusCheckoutClosureSettings,
+} from './plus-checkout-closure';
 
 export type AutomationStepId =
   | 'cleanup-environment'
@@ -8,6 +13,7 @@ export type AutomationStepId =
   | 'wait-register-email-code'
   | 'fill-profile'
   | 'read-chatgpt-session'
+  | 'run-plus-checkout-closure'
   | 'create-checkout-link'
   | 'open-checkout-link'
   | 'select-sms'
@@ -25,7 +31,7 @@ export type AutomationStepId =
 export type AutomationStepStatus = 'pending' | 'running' | 'success' | 'error' | 'skipped';
 export type AutomationLogLevel = 'info' | 'success' | 'error' | 'warn';
 export type AutomationEmailStatus = 'idle' | 'running' | 'used' | 'error';
-export type AutomationEmailSelectionMode = 'next' | 'specified';
+export type AutomationEmailSelectionMode = 'random' | 'next' | 'specified';
 export type AutomationSmsSelectionMode = 'random' | 'next';
 export type AutomationSmsSourceMode = 'api' | 'foxsms';
 export type AutomationOAuthExtractMode = 'email' | 'direct';
@@ -89,6 +95,9 @@ export interface AutomationSettings {
   oauthExtractMode: AutomationOAuthExtractMode;
   checkoutOptions: Partial<CheckoutOptions>;
   checkoutExtractMode?: CheckoutExtractMode;
+  plusCheckoutClosure: PlusCheckoutClosureSettings;
+  /** mail.acica.top auto mailbox + OTP */
+  acicaMailbox?: AcicaMailboxSettings;
 }
 
 export interface AutomationRunState {
@@ -112,6 +121,7 @@ export interface AutomationRunState {
   targetWindowId: number;
   startedAt: number;
   finishedAt: number;
+  plusCheckoutClosure?: PlusCheckoutClosureRun;
 }
 
 export interface AutomationLogEntry {
