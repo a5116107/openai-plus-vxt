@@ -462,6 +462,60 @@ export interface ProbeHitDashboardSummary {
   latestAt: number;
 }
 
+export type ProbeArchiveEntity = 'observations' | 'hits' | 'runs';
+
+export interface ProbeArchiveStatus {
+  available: boolean;
+  degraded: boolean;
+  backend: 'indexeddb' | 'local';
+  schemaVersion: number;
+  migratedAt: number;
+  observationCount: number;
+  hitCount: number;
+  runCount: number;
+  retentionDays: number;
+  lastPrunedAt: number;
+  lastError: string;
+}
+
+export interface ProbeRunArchiveRecord {
+  archiveId: string;
+  taskId: string;
+  taskName: string;
+  runId: string;
+  cycleId: string;
+  status: ProbeTaskStatus;
+  startedAt: number;
+  finishedAt: number;
+  totalUnits: number;
+  completedUnits: number;
+  skippedUnits: number;
+  processed: number;
+  hits: number;
+  errors: number;
+  message: string;
+  units: ProbeTaskUnitRuntime[];
+  updatedAt: number;
+}
+
+export interface ProbeArchiveQuery {
+  entity: ProbeArchiveEntity;
+  page?: number;
+  pageSize?: number;
+  query?: string;
+  country?: string;
+  outcome?: string;
+}
+
+export interface ProbeArchivePage {
+  entity: ProbeArchiveEntity;
+  page: number;
+  pageSize: number;
+  total: number;
+  records: Array<ProbeObservation | ProbeHitDatabaseRecord | ProbeRunArchiveRecord>;
+  status: ProbeArchiveStatus;
+}
+
 export interface ProbeAccountReportRow {
   accountId: string;
   email: string;
@@ -950,6 +1004,7 @@ export interface ProbeState {
   adaptiveRecommendations: ProbeAdaptiveRecommendation[];
   experimentCoverage: ProbeExperimentCoverage;
   experimentReadiness: ProbeExperimentReadiness;
+  archiveStatus: ProbeArchiveStatus;
   activeTaskId: string;
   updatedAt: number;
 }
@@ -993,6 +1048,34 @@ export interface ProbeHitDbDeleteMessage {
 export interface ProbeHitDbExportMessage {
   type: 'opx:probe-hitdb-export';
   filter?: Partial<ProbeHitDashboardFilter>;
+}
+
+export interface ProbeArchiveQueryMessage {
+  type: 'opx:probe-archive-query';
+  query: ProbeArchiveQuery;
+}
+
+export interface ProbeArchiveExportMessage {
+  type: 'opx:probe-archive-export';
+  query: Omit<ProbeArchiveQuery, 'page' | 'pageSize'>;
+}
+
+export interface ProbeArchiveClearMessage {
+  type: 'opx:probe-archive-clear';
+  entity: ProbeArchiveEntity | 'all';
+}
+
+export interface ProbeArchivePruneMessage {
+  type: 'opx:probe-archive-prune';
+  retentionDays: number;
+}
+
+export interface ProbeArchiveResponse {
+  ok: boolean;
+  message: string;
+  page?: ProbeArchivePage;
+  status?: ProbeArchiveStatus;
+  exportText?: string;
 }
 
 

@@ -26,9 +26,11 @@ import {
   type StructuredProbeCredential,
 } from './session-import';
 import { evaluateProbeTreatmentValidity } from './validity';
+import { ensureProbeArchiveMigrated, getProbeArchiveRepository } from './archive';
 export { buildFreshProbeStageSnapshot, createProbeRunUnits, dedupeProbeHits, getProbeRuntimeProgress } from './runtime';
 import type {
   ProbeAccount,
+  ProbeArchiveStatus,
   ProbeAccountReportRow,
   ProbeCheckoutSniff,
   ProbeCountryScore,
@@ -57,6 +59,20 @@ const MAX_HITS = 400;
 const MAX_HIT_DB = 2000;
 const DEFAULT_MAX_OBSERVATIONS = 3000;
 const MAX_DRIFT_ALERTS = 200;
+
+const EMPTY_ARCHIVE_STATUS: ProbeArchiveStatus = {
+  available: false,
+  degraded: false,
+  backend: 'local',
+  schemaVersion: 1,
+  migratedAt: 0,
+  observationCount: 0,
+  hitCount: 0,
+  runCount: 0,
+  retentionDays: 0,
+  lastPrunedAt: 0,
+  lastError: '',
+};
 
 const EMPTY_FACTOR_REPORT: ProbeFactorReport = {
   generatedAt: 0,
@@ -217,6 +233,7 @@ const DEFAULT_STATE: ProbeState = {
   adaptiveRecommendations: [],
   experimentCoverage: EMPTY_EXPERIMENT_COVERAGE,
   experimentReadiness: EMPTY_EXPERIMENT_READINESS,
+  archiveStatus: EMPTY_ARCHIVE_STATUS,
   activeTaskId: '',
   updatedAt: 0,
 };
@@ -224,7 +241,13 @@ const DEFAULT_STATE: ProbeState = {
 export async function loadProbeState(): Promise<ProbeState> {
   const key = scopedStorageKey(PROBE_STORAGE_KEY);
   const data = await browser.storage.local.get(key);
-  return normalizeProbeState(data[key]);
+  const state = normalizeProbeState(data[key]);
+  const archiveStatus = await ensureProbeArchiveMigrated({
+    observations: state.observations,
+    hits: state.hitDatabase,
+    tasks: state.tasks,
+  });
+  return { ...state, archiveStatus };
 }
 
 export async function saveProbeState(patch: Partial<ProbeState>): Promise<ProbeState> {
@@ -243,6 +266,7 @@ export async function saveProbeState(patch: Partial<ProbeState>): Promise<ProbeS
     factorReport: Object.prototype.hasOwnProperty.call(patch, 'factorReport') ? patch.factorReport || EMPTY_FACTOR_REPORT : current.factorReport,
     driftAlerts: Object.prototype.hasOwnProperty.call(patch, 'driftAlerts') ? patch.driftAlerts || [] : current.driftAlerts,
     adaptiveRecommendations: Object.prototype.hasOwnProperty.call(patch, 'adaptiveRecommendations') ? patch.adaptiveRecommendations || [] : current.adaptiveRecommendations,
+    archiveStatus: Object.prototype.hasOwnProperty.call(patch, 'archiveStatus') ? patch.archiveStatus || EMPTY_ARCHIVE_STATUS : current.archiveStatus,
     updatedAt: Date.now(),
   });
   await browser.storage.local.set({ [scopedStorageKey(PROBE_STORAGE_KEY)]: next });
@@ -332,6 +356,7 @@ export function normalizeProbeState(value: unknown): ProbeState {
     adaptiveRecommendations,
     experimentCoverage,
     experimentReadiness,
+    archiveStatus: normalizeArchiveStatus(source.archiveStatus),
     activeTaskId,
     updatedAt: Number(source.updatedAt || 0),
   };
@@ -1453,7 +1478,8 @@ export async function appendProbeObservation(
     driftAlerts,
     clampInt(config.adaptiveExplorationPercent, 5, 50, 20),
   );
-  return saveProbeState({ observations, factorReport, driftAlerts, adaptiveRecommendations });
+  const archiveStatus = await getProbeArchiveRepository().upsertObservations([observation]);
+  return saveProbeState({ observations, factorReport, driftAlerts, adaptiveRecommendations, archiveStatus });
 }
 
 export async function importProbeObservations(
@@ -1492,16 +1518,20 @@ export async function importProbeObservations(
   const observations = merged
     .sort((a, b) => b.observedAt - a.observedAt)
     .slice(0, limit);
-  const state = await saveProbeState({ observations });
+  if (mode === 'replace') await getProbeArchiveRepository().clear('observations');
+  const archiveStatus = await getProbeArchiveRepository().upsertObservations(normalized);
+  const state = await saveProbeState({ observations, archiveStatus });
   return { state, imported: normalized.length, rejected, duplicates };
 }
 
 export async function clearProbeFactorData(): Promise<ProbeState> {
+  const archiveStatus = await getProbeArchiveRepository().clear('observations');
   return saveProbeState({
     observations: [],
     factorReport: EMPTY_FACTOR_REPORT,
     driftAlerts: [],
     adaptiveRecommendations: [],
+    archiveStatus,
   });
 }
 
@@ -1586,7 +1616,8 @@ export async function saveHitToDatabase(hit: ProbeHitRecord, taskName = ''): Pro
     record,
     ...current.hitDatabase.filter((item) => !(item.link && record.link && item.link === record.link && item.email === record.email && item.country === record.country)),
   ].slice(0, MAX_HIT_DB);
-  return saveProbeState({ hitDatabase: nextDb });
+  const archiveStatus = await getProbeArchiveRepository().upsertHits([record]);
+  return saveProbeState({ hitDatabase: nextDb, archiveStatus });
 }
 
 export async function appendProbeHitAndMaybePersist(
@@ -1671,13 +1702,33 @@ export function queryHitDatabase(
 
 export async function deleteHitDatabaseRecord(dbId: string): Promise<ProbeState> {
   const current = await loadProbeState();
+  const archiveStatus = await getProbeArchiveRepository().deleteHit(dbId);
   return saveProbeState({
     hitDatabase: current.hitDatabase.filter((item) => item.dbId !== dbId),
+    archiveStatus,
   });
 }
 
+function normalizeArchiveStatus(value: unknown): ProbeArchiveStatus {
+  if (!isRecord(value)) return { ...EMPTY_ARCHIVE_STATUS };
+  return {
+    available: Boolean(value.available),
+    degraded: Boolean(value.degraded),
+    backend: value.backend === 'indexeddb' ? 'indexeddb' : 'local',
+    schemaVersion: Math.max(1, Number(value.schemaVersion || 1)),
+    migratedAt: Number(value.migratedAt || 0),
+    observationCount: Math.max(0, Number(value.observationCount || 0)),
+    hitCount: Math.max(0, Number(value.hitCount || 0)),
+    runCount: Math.max(0, Number(value.runCount || 0)),
+    retentionDays: Math.max(0, Number(value.retentionDays || 0)),
+    lastPrunedAt: Math.max(0, Number(value.lastPrunedAt || 0)),
+    lastError: String(value.lastError || '').slice(0, 500),
+  };
+}
+
 export async function clearHitDatabase(): Promise<ProbeState> {
-  return saveProbeState({ hitDatabase: [] });
+  const archiveStatus = await getProbeArchiveRepository().clear('hits');
+  return saveProbeState({ hitDatabase: [], archiveStatus });
 }
 
 export function exportHitDatabaseCsv(records: ProbeHitDatabaseRecord[]): string {

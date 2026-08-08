@@ -5,8 +5,8 @@
 ## 当前完成边界
 
 - 版本：`0.0.37`。
-- 本地实现：试用资格分类、严格晋级、十类支付方式候选与终链、保存支付方式、Plus 双 Checkout、Auth/Checkout/Billing 多阶段出口、恢复不重放、运营看板和脱敏证据均已落地。
-- 本地验证：TypeScript、125 项全量测试、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
+- 本地实现：试用资格分类、严格晋级、十类支付方式候选与终链、保存支付方式、Plus 双 Checkout、Auth/Checkout/Billing 多阶段出口、恢复不重放、IndexedDB 归档、独立运营页面、隔离上下文调度和脱敏证据均已落地。
+- 本地验证：TypeScript、131 项全量测试、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、归档运营页 12/12、资格看板 32/32、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
 - 发布：fork 预发布 `v0.0.37-ssot.1` 已包含 Chrome ZIP、Firefox XPI、发布清单和回滚说明。
 - 质量策略：功能、安全、工作流和证据门为 PASS；跨 184 文件迁移的 change/shape budget 继续作为显式结构债务，不提升为严格 PASS。
 
@@ -19,7 +19,7 @@
 | `e2e-acica-auto` / `e2e-mailbox-pool` / `register-tool-env` | 完成 | 邮箱同步、导入、选择、OTP 和 Session 交接已有浏览器证据 |
 | `eligibility-factors` | 完成实现 | EF-15/26/27/32/39/42 属于真实数据或外部环境缺口 |
 | `multi-factor-experiments` | 完成实现 | MF-18 等待真实多国家出口恢复后运行平衡矩阵 |
-| `operations-console` | 完成实现 | OC-09 等待在线同轮命中；OC-10/11 为后续规模化能力 |
+| `operations-console` | 完成实现 | OC-10 IndexedDB/运营页和 OC-11 隔离调度契约已完成；OC-09 等待在线同轮命中 |
 | `payment-runner` | 完成 | 强制筛查不晋级、未知副作用不重放、终链白名单已验证 |
 | `quality-remediation` | 完成 | AppSec 10/10、skills、stack-run、verify-evidence 与总复核通过 |
 | `runtime-log` | 完成 | 运行日志、失败分级、广播、导出和 UI 已验证 |
@@ -41,6 +41,6 @@
 | 上游交付 | `suyancc/openai-plus-vxt` PR/推送 | 上游仓库写权限或具备创建 PR 权限的 GitHub Token |
 | 商店发布 | Chrome/Firefox 商店提交 | 对应商店开发者凭据、签名和审核资料 |
 | 结构治理 | change/shape budget | 将 184 文件迁移拆分为可审计边界，缩减既有超大文件和静默 fallback |
-| 规模化能力 | OC-10、OC-11 | IndexedDB 迁移与隔离 Worker 代理上下文；不属于 0.0.37 功能闭环阻塞项 |
+| 外部隔离适配器 | OC-11 环境扩展 | 提供至少两个不同 `proxyContextId`、非空 `isolationProof` 和真实互异出口；内置单 profile 保持并发 1 |
 
 任何真实账号、资格、支付或出口结论只由显式 live profile 的同次运行证据产生；本地 fixture 只证明流程、状态机和安全边界。

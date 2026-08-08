@@ -99,11 +99,13 @@ import type {
 
 import {
   applyProbeAccountAction,
+  clearProbeArchive,
   clearProbeHits,
   controlProbe,
   deleteProbeHitDatabaseRecord,
   deleteProbeTask,
   exportProbeHitDatabase,
+  exportProbeArchive,
   exportProbeFactorAnalysis,
   exportProbeMethodDetections,
   queryProbeMethodDetections,
@@ -117,6 +119,8 @@ import {
   ensureSmartProbeBootstrap,
   importSessionToProbePool,
   queryProbeHitDatabase,
+  queryProbeArchive,
+  pruneProbeArchive,
   saveProbeAccounts,
   upsertProbeTask,
 } from '../src/features/probe/service';
@@ -134,6 +138,10 @@ import type {
 } from '../src/features/run-log/types';
 import type {
   ProbeAccountActionMessage,
+  ProbeArchiveClearMessage,
+  ProbeArchiveExportMessage,
+  ProbeArchiveQueryMessage,
+  ProbeArchivePruneMessage,
   ProbeAccountReportMessage,
   ProbeClearHitsMessage,
   ProbeControlMessage,
@@ -294,6 +302,18 @@ export default defineBackground(() => {
     }
     if (isProbeHitDbExportMessage(message)) {
       return exportProbeHitDatabase(message.filter || {});
+    }
+    if (isProbeArchiveQueryMessage(message)) {
+      return queryProbeArchive(message.query);
+    }
+    if (isProbeArchiveExportMessage(message)) {
+      return exportProbeArchive(message.query);
+    }
+    if (isProbeArchiveClearMessage(message)) {
+      return clearProbeArchive(message.entity);
+    }
+    if (isProbeArchivePruneMessage(message)) {
+      return pruneProbeArchive(message.retentionDays);
     }
     if (isProbeMethodsQueryMessage(message)) {
     return queryProbeMethodDetections();
@@ -4353,6 +4373,30 @@ function isProbeHitDbDeleteMessage(message: unknown): message is ProbeHitDbDelet
 }
 function isProbeHitDbExportMessage(message: unknown): message is ProbeHitDbExportMessage {
   return Boolean(message && typeof message === 'object' && (message as ProbeHitDbExportMessage).type === 'opx:probe-hitdb-export');
+}
+
+function isProbeArchiveQueryMessage(message: unknown): message is ProbeArchiveQueryMessage {
+  const candidate = message as ProbeArchiveQueryMessage;
+  return Boolean(candidate && typeof candidate === 'object' && candidate.type === 'opx:probe-archive-query'
+    && ['observations', 'hits', 'runs'].includes(candidate.query?.entity));
+}
+
+function isProbeArchiveExportMessage(message: unknown): message is ProbeArchiveExportMessage {
+  const candidate = message as ProbeArchiveExportMessage;
+  return Boolean(candidate && typeof candidate === 'object' && candidate.type === 'opx:probe-archive-export'
+    && ['observations', 'hits', 'runs'].includes(candidate.query?.entity));
+}
+
+function isProbeArchiveClearMessage(message: unknown): message is ProbeArchiveClearMessage {
+  const candidate = message as ProbeArchiveClearMessage;
+  return Boolean(candidate && typeof candidate === 'object' && candidate.type === 'opx:probe-archive-clear'
+    && ['observations', 'hits', 'runs', 'all'].includes(candidate.entity));
+}
+
+function isProbeArchivePruneMessage(message: unknown): message is ProbeArchivePruneMessage {
+  const candidate = message as ProbeArchivePruneMessage;
+  return Boolean(candidate && typeof candidate === 'object' && candidate.type === 'opx:probe-archive-prune'
+    && Number.isFinite(candidate.retentionDays) && candidate.retentionDays >= 1 && candidate.retentionDays <= 3650);
 }
 
 function isProbeMethodsQueryMessage(message: unknown): message is ProbeMethodsQueryMessage {

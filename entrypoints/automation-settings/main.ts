@@ -155,6 +155,7 @@ async function render(): Promise<void> {
           <p class="subtitle">邮箱账号与验证码默认由 Acica 自动同步和取件；Outlook 本地服务保留为兜底。</p>
         </div>
         <div class="button-row">
+          <button id="btn-operations-console" class="button secondary" type="button">运营控制台</button>
           <button id="btn-copy-diagnostics" class="button secondary" type="button">复制诊断报告</button>
           <button id="btn-save" class="button" type="button">保存设置</button>
           <button id="btn-close" class="button secondary" type="button">关闭</button>
@@ -1609,6 +1610,10 @@ const clearSmsButton = mustGet('btn-clear-sms') as HTMLButtonElement;
   wireGeneratedFileActions();
   wireOAuthPhoneActions(oauthPhone);
   mustGet('btn-close').addEventListener('click', () => window.close());
+  mustGet('btn-operations-console').addEventListener('click', () => {
+    const url = browser.runtime.getURL('/operations-console.html' as Parameters<typeof browser.runtime.getURL>[0]);
+    void browser.tabs.create({ url });
+  });
   const copyDiagnosticsButton = mustGet('btn-copy-diagnostics') as HTMLButtonElement;
   copyDiagnosticsButton.addEventListener('click', async () => {
     const restoreButton = setButtonPending(copyDiagnosticsButton, '复制中...');

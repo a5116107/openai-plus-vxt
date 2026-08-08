@@ -45,6 +45,12 @@ import {
   qualificationLinkAggregateStatus,
 } from './qualification';
 import { buildPaymentOperationIdempotencyKey } from './execution-policy';
+import { getProbeArchiveRepository } from './archive';
+import {
+  BROWSER_GLOBAL_PROXY_CONTEXT,
+  ProbeProxyContextScheduler,
+  resolveProbeWorkerPlan,
+} from './worker-pool';
 import {
   identityResolution,
   isIdentitySnapshotReady,
@@ -85,6 +91,9 @@ import {
 import { classifyFailureLevel, logRun } from '../run-log/service';
 import type {
   ProbeAccount,
+  ProbeArchiveEntity,
+  ProbeArchiveQuery,
+  ProbeArchiveResponse,
   ProbeAccountReportRow,
   ProbeCheckoutSniff,
   ProbeHitKind,
@@ -106,6 +115,7 @@ import type {
 const ALARM_PREFIX = 'opx-probe-task:';
 let runningTaskId = '';
 let stopRequested = false;
+const probeProxyContextScheduler = new ProbeProxyContextScheduler();
 
 function accountLogLabel(account: ProbeAccount, index?: number): string {
   const n = typeof index === 'number' && index >= 0 ? index + 1 : 0;
@@ -368,6 +378,48 @@ export async function exportProbeHitDatabase(filter: Partial<ProbeHitDashboardFi
     records: result.records,
     summary: result.summary,
     exportText: exportHitDatabaseCsv(result.records),
+  };
+}
+
+export async function queryProbeArchive(query: ProbeArchiveQuery): Promise<ProbeArchiveResponse> {
+  const page = await getProbeArchiveRepository().query(query);
+  return {
+    ok: !page.status.degraded,
+    message: page.status.degraded ? `归档层已降级：${page.status.lastError}` : `归档记录 ${page.total} 条`,
+    page,
+    status: page.status,
+  };
+}
+
+export async function exportProbeArchive(query: Omit<ProbeArchiveQuery, 'page' | 'pageSize'>): Promise<ProbeArchiveResponse> {
+  const repository = getProbeArchiveRepository();
+  const exportText = await repository.export(query);
+  const status = repository.getStatus();
+  return {
+    ok: !status.degraded,
+    message: status.degraded ? `归档导出失败：${status.lastError}` : '归档导出已生成',
+    status,
+    exportText: exportText || undefined,
+  };
+}
+
+export async function clearProbeArchive(entity: ProbeArchiveEntity | 'all'): Promise<ProbeArchiveResponse> {
+  const status = await getProbeArchiveRepository().clear(entity);
+  return {
+    ok: !status.degraded,
+    message: status.degraded ? `归档清理失败：${status.lastError}` : '归档数据已清理',
+    status,
+  };
+}
+
+export async function pruneProbeArchive(retentionDays: number): Promise<ProbeArchiveResponse> {
+  const result = await getProbeArchiveRepository().prune(retentionDays);
+  return {
+    ok: !result.status.degraded,
+    message: result.status.degraded
+      ? `归档保留策略失败：${result.status.lastError}`
+      : `已按 ${result.status.retentionDays} 天保留策略清理 ${result.removed} 条`,
+    status: result.status,
   };
 }
 
@@ -1069,9 +1121,7 @@ export async function runProbeTask(taskId: string, reschedule: boolean): Promise
   let hits = 0;
   let errors = 0;
 
-  // Extension proxy is process-wide; keep effective concurrency at 1 for correct country switching.
-  const queueSize = Math.max(1, Math.min(task.config.concurrency, 1));
-  void queueSize;
+  const workerPlan = resolveProbeWorkerPlan(task.config.concurrency, [BROWSER_GLOBAL_PROXY_CONTEXT]);
   const skippedAccounts = new Set<string>();
   for (let scheduleIndex = 0; scheduleIndex < schedule.length; scheduleIndex += 1) {
     const scheduleEntry = schedule[scheduleIndex];
@@ -1135,7 +1185,9 @@ export async function runProbeTask(taskId: string, reschedule: boolean): Promise
       });
       resetActiveProbeStageTrace();
       const observationStartedAt = Date.now();
-      const result = await probeAccountCountry(executionTask, account, country, accountIndex, scheduleEntry.seedOrdinal);
+      const result = await probeProxyContextScheduler.run(workerPlan.contexts[0], () => (
+        probeAccountCountry(executionTask, account, country, accountIndex, scheduleEntry.seedOrdinal)
+      ));
       processed += 1;
       let evaluatedHit = result.hit;
       const isCheckoutCandidate = evaluatedHit.ok && evaluatedHit.hitKind !== 'none' && evaluatedHit.hitKind !== 'error';
@@ -3591,7 +3643,11 @@ async function updateTaskRuntime(taskId: string, patch: Partial<ProbeTask['runti
         updatedAt: Date.now(),
       }
     : task);
-  return saveProbeState({ tasks, activeTaskId: taskId });
+  const task = tasks.find((item) => item.id === taskId);
+  const archiveStatus = task
+    ? await getProbeArchiveRepository().upsertTask(task)
+    : current.archiveStatus;
+  return saveProbeState({ tasks, activeTaskId: taskId, archiveStatus });
 }
 
 async function ensureAlarm(taskId: string, intervalSec: number): Promise<void> {
