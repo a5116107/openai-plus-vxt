@@ -77,11 +77,12 @@ test('支付终链聚合状态严格要求源资格、方式呈现、资格保�
   assert.equal(qualificationLinkAggregateStatus({ ...base, methodOffered: false }), 'probe_required');
   assert.equal(qualificationLinkAggregateStatus({ ...base, qualificationPreserved: false }), 'probe_required');
   assert.equal(qualificationLinkAggregateStatus({ ...base, finalLinkVerified: false }), 'probe_required');
+  assert.equal(qualificationLinkAggregateStatus({ ...base, forcedProbe: true }), 'probe_required');
   assert.equal(qualificationLinkAggregateStatus({
     ...base, sessionMode: 'independent_checkout', sessionDistinct: false,
   }), 'probe_required');
   assert.equal(qualificationLinkAggregateStatus({
-    ...base, sessionMode: 'independent_checkout', sessionDistinct: true,
+    ...base, sessionMode: 'independent_checkout', sessionDistinct: true, sourceSessionReused: false,
   }), 'qualified_payment_link');
 });
 
@@ -112,6 +113,11 @@ test('支付写操作使用稳定幂等键，未知副作用恢复只查询原 C
   const key = buildPaymentOperationIdempotencyKey('run-a', 'account-a', 'cs_test_a', 'upi');
   assert.equal(key, buildPaymentOperationIdempotencyKey('run-a', 'account-a', 'cs_test_a', 'upi'));
   assert.notEqual(key, buildPaymentOperationIdempotencyKey('run-a', 'account-a', 'cs_test_b', 'upi'));
+  assert.notEqual(key, buildPaymentOperationIdempotencyKey('run-a', 'account-a', 'cs_test_a', 'upi', 'route-b'));
+  assert.notEqual(key, buildPaymentOperationIdempotencyKey('run-a', 'account-a', 'cs_test_a', 'upi', 'default', 2));
+  assert.equal(recoveryActionForPaymentCheckpoint({
+    status: 'link_ready', confirmSubmitted: true, approveSubmitted: false, sideEffect: 'confirmed',
+  }), 'revalidate_completed');
   assert.equal(recoveryActionForPaymentCheckpoint({
     status: 'side_effect_inconclusive', confirmSubmitted: true, approveSubmitted: false, sideEffect: 'unknown',
   }), 'query_original_checkout');

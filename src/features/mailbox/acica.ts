@@ -3,8 +3,8 @@
  * list accounts for registration email pool + poll OTP by email.
  */
 export const DEFAULT_ACICA_BASE_URL = 'https://mail.acica.top';
-export const DEFAULT_ACICA_API_KEY = '0d807524f93491e4f7505237f1887737';
-export const DEFAULT_ACICA_WEB_PASSWORD = 'liuyujian';
+export const DEFAULT_ACICA_API_KEY = '';
+export const DEFAULT_ACICA_WEB_PASSWORD = '';
 
 export interface AcicaMailboxSettings {
   enabled: boolean;

@@ -22,6 +22,7 @@
     "test:saved-payment-methods": "tsx --test tests/saved-payment-methods.test.ts",
     "test:saved-payment-backend": "node --test tests/saved-payment-test-backend.test.mjs",
     "test:e2e-auth-exit": "node scripts/e2e-auth-exit-rotation.mjs",
+    "test:e2e-proxy-stages": "node scripts/e2e-proxy-stages.mjs",
     "test:e2e-saved-payment": "node scripts/e2e-saved-payment-live.mjs",
     "test:e2e-saved-payment:check": "node scripts/e2e-saved-payment-live.mjs --check",
     "test:e2e-saved-payment:profile": "node scripts/e2e-saved-payment-live.mjs --probe-profile",

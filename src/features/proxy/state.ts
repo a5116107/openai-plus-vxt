@@ -5,7 +5,9 @@ import {
   DEFAULT_EXIT2_PROXY,
   DEFAULT_FRONT_PROXY,
   DEFAULT_AUTOMATION_PROXY_ROUTING,
+  DEFAULT_PROXY_META_URL,
   DEFAULT_PROXY_SETTINGS,
+  DEFAULT_PROXY_TRACE_URL,
   type AutomationProxyFallbackStage,
   type AutomationProxyRouting,
   type AutomationProxyStage,
@@ -87,6 +89,15 @@ export function normalizeAutomationRouting(value: unknown): AutomationProxyRouti
     verifyExitOnSwitch: source.verifyExitOnSwitch === undefined
       ? DEFAULT_AUTOMATION_PROXY_ROUTING.verifyExitOnSwitch
       : Boolean(source.verifyExitOnSwitch),
+    verificationTraceUrl: validatedVerificationUrl(
+      source.verificationTraceUrl,
+      DEFAULT_PROXY_TRACE_URL,
+    ),
+    verificationMetaUrl: validatedVerificationUrl(
+      source.verificationMetaUrl,
+      DEFAULT_PROXY_META_URL,
+      true,
+    ),
     requireDistinctExits: source.requireDistinctExits === undefined
       ? DEFAULT_AUTOMATION_PROXY_ROUTING.requireDistinctExits
       : Boolean(source.requireDistinctExits),
@@ -97,6 +108,22 @@ export function normalizeAutomationRouting(value: unknown): AutomationProxyRouti
     billing: normalizeAutomationRoute(source.billing, DEFAULT_AUTOMATION_PROXY_ROUTING.billing),
     evidence: normalizeAutomationEvidence(source.evidence),
   };
+}
+
+function validatedVerificationUrl(value: unknown, fallback: string, allowEmpty = false): string {
+  const raw = value === undefined ? fallback : String(value).trim();
+  if (allowEmpty && !raw) return '';
+  try {
+    const parsed = new URL(raw);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+      && !parsed.username
+      && !parsed.password
+      && raw.length <= 2048
+      ? parsed.toString()
+      : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function normalizeAutomationRoute(value: unknown, fallback: AutomationProxyStageRoute): AutomationProxyStageRoute {

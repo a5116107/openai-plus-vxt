@@ -1,6 +1,6 @@
 # 试用资格与多支付提链 SSOT
 
-状态：`canonical-implemented`，文档版本 `1.1.0`，更新时间：2026-08-06
+状态：`canonical-implemented`，文档版本 `1.1.2`，更新时间：2026-08-07
 
 本文件是试用、优惠、零金额资格探测，以及多支付方式提取终链的唯一编排真相。`smart-automation`、`payment-runner`、`eligibility-factors`、`multi-factor-experiments` 和 `saved-payment-methods` 只保留领域细节；当这些文档与本文件的编排规则冲突时，以本文件为准。
 
@@ -53,11 +53,12 @@ methodOffered == true
 qualificationPreserved == true
 qualificationVerified == true
 finalLinkVerified == true
+forcedProbe == false
 ```
 
-`sourceSessionReused` 在复用模式必须为 `true`；独立 Checkout 模式必须证明 `sessionDistinct == true`，并在独立会话重新通过资格门禁。任何字段缺失都只能是 `probe_required` 或失败状态，不能降级为成功。
+`sourceSessionReused` 在复用模式必须为 `true`。独立 Checkout 模式必须保持 `sourceSessionReused == false`，证明 `sessionDistinct == true`，并在独立会话重新通过资格门禁。任何字段缺失都只能是 `probe_required` 或失败状态，不能降级为成功。
 
-`qualified_payment_link` 与 `probe_required` 是已落地的目标聚合状态。独立 Checkout 还必须满足 `sessionDistinct=true`；Hosted 源长链固定按复用源资格会话计算，不伪装为独立 Checkout。
+`qualified_payment_link` 与 `probe_required` 是已落地的目标聚合状态。独立 Checkout 还必须满足 `sessionDistinct=true`；Hosted 源长链固定按复用源资格会话计算，不伪装为独立 Checkout。强制筛查即使事实上通过严格门且获得白名单终链，方式状态也固定为 `forced_probe`、聚合状态固定为 `probe_required`，不得覆盖最佳链接或主 Runner。
 
 ### 3.2 写操作不变量
 
@@ -138,7 +139,7 @@ ProbeRun
 
 ### 6.5 阶段 4：方式发现与筛查
 
-优先读取 Stripe init/Checkout 暴露的 `payment_method_types`。未暴露方式进入 `forcedProbe` 队列，结果只允许 `probe_required`、`method_not_offered` 或失败，不得伪造 `methodOffered`。
+优先读取 Stripe init/Checkout 暴露的 `payment_method_types`。未暴露方式进入 `forcedProbe` 队列；若新 Checkout 事实上暴露该方式，可以记录 `methodOffered=true`、严格门和终链事实，但方式状态必须为 `forced_probe`、聚合状态必须为 `probe_required`。未暴露时为 `method_not_offered` 或其他失败，不得伪造 `methodOffered`。
 
 ### 6.6 阶段 5：支付 Runner
 
@@ -190,6 +191,8 @@ screen -> revalidate -> createPM -> confirm -> approve -> poll -> finalize
 | 支付授权 | 无或 Hosted | provider | `confirm`/`approve`/`poll` | `runnerExit` |
 
 出口快照至少包含 `proxyId`、`actualIp`、`actualCountry`、`asn`、`colo`、`checkedAt`。阶段切换顺序固定为 Auth -> Checkout -> Billing/provider -> Runner；不得在单次 confirm 期间切换出口。
+
+出口校验默认读取 Cloudflare trace/meta；`automationRouting.verificationTraceUrl` 与 `verificationMetaUrl` 可替换为 HTTP(S) 校验服务，URL 不允许内嵌凭据，meta 可显式关闭。浏览器回归默认自启动三组本地 HTTP 代理并注入 RFC 5737 文档网段证据；设置完整的 `OPX_E2E_AUTH_PORT`、`OPX_E2E_CHECKOUT_PORT`、`OPX_E2E_BILLING_PORT` 后切换为真实代理模式。fixture 证据只证明扩展切换、校验、黏性、去重和账本展示链，不冒充公网出口资格结论。
 
 ## 10. 调度、覆盖率与停止条件
 
@@ -243,7 +246,7 @@ link_coverage = provider-final 终链数 / method_offered 数
 
 1. 读取最后一个 `checkpoint`，恢复未完成的只读阶段。
 2. 对 `unknown_side_effect` 只做查询，不重放写操作。
-3. 对已 `link_ready` 的方式只重新校验 URL 和资格，不重新 confirm。
+3. 对已 `link_ready` 的方式先校验 URL 白名单，再以 `restore_link_ready` 执行一次只读严格资格重验；不重新执行 createPM/confirm/approve/poll/finalize，资格失效时返回 `not_qualified` 且不返回旧终链。
 4. 账号切换必须清空浏览器上下文和出口锁，保留账本关联。
 5. 检测到金额、币种、方式暴露或身份漂移时，关闭当前单元并创建 drift 事件。
 
