@@ -26,7 +26,7 @@
 
 浏览器证据目录：`.context-snapshots/e2e-eligibility-dashboard-0.0.28/` 与 `.context-snapshots/e2e-automation-qualification-0.0.28/`。结果 JSON 必须满足页面错误 0、控制台错误 0；看板移动端无整页横向溢出，资格 E2E 必须验证命中记录持久化和完整字段关联。
 
-交付制品 `dist/openai-plus-vxt-0.0.28.xpi` 与 `dist/openai-plus-vxt-0.0.28-mullvad.xpi` 的 SHA-256 均为 `4068C0B01A8C312D12FFDE726AFE26313B5F560275C32D69EB4A03AB9480211C`。
+本轮 fork 预发布 `v0.0.37-ssot.2` 附带 `.output/openai-plus-vxt-0.0.37-chrome.zip`、`.output/openai-plus-vxt-0.0.37-firefox.zip` 和 sources ZIP；具体 SHA-256 以 GitHub release asset 为准。历史 `0.0.28` 制品校验值保留在旧验收记录中。
 
 ## 尚未满足的验收
 
