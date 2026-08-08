@@ -1,0 +1,218 @@
+{
+  "schemaVersion": 1,
+  "generated": {
+    "by": "workflow-kit stack-detect",
+    "at": "2026-07-28T19:57:16.014Z"
+  },
+  "workspaces": [
+    {
+      "id": "root",
+      "path": ".",
+      "stacks": [
+        "node"
+      ],
+      "tools": {
+        "node": {
+          "packageManager": "pnpm"
+        }
+      },
+      "tasks": [
+        {
+          "id": "guard:docs",
+          "stack": "repo",
+          "args": [
+            "node",
+            "scripts/guardrails/docs-consistency.js"
+          ],
+          "optional": true,
+          "timeoutSec": 60
+        },
+        {
+          "id": "guard:skills",
+          "stack": "repo",
+          "args": [
+            "node",
+            "scripts/guardrails/skills-consistency.js",
+            "--strict"
+          ],
+          "optional": true,
+          "timeoutSec": 60
+        },
+        {
+          "id": "guard:vibe",
+          "stack": "repo",
+          "args": [
+            "node",
+            "scripts/guardrails/vibe-coding.js",
+            "--strict",
+            "--scan-changed"
+          ],
+          "optional": true,
+          "timeoutSec": 60
+        },
+        {
+          "id": "guard:secrets",
+          "stack": "repo",
+          "args": [
+            "node",
+            "scripts/guardrails/secrets-scan.js"
+          ],
+          "optional": false,
+          "timeoutSec": 60
+        },
+        {
+          "id": "guard:security",
+          "stack": "repo",
+          "args": [
+            "node",
+            "scripts/guardrails/security-scan.js",
+            "--strict",
+            "--scan-changed"
+          ],
+          "optional": true,
+          "timeoutSec": 300
+        },
+        {
+          "id": "guard:deps",
+          "stack": "repo",
+          "args": [
+            "node",
+            "scripts/guardrails/deps-guard.js",
+            "--strict"
+          ],
+          "optional": true,
+          "timeoutSec": 60
+        },
+        {
+          "id": "install",
+          "stack": "node",
+          "args": [
+            "pnpm",
+            "install",
+            "--frozen-lockfile"
+          ],
+          "optional": true,
+          "timeoutSec": 900
+        },
+        {
+          "id": "check:build",
+          "stack": "node",
+          "args": [
+            "pnpm",
+            "run",
+            "build"
+          ],
+          "optional": true,
+          "timeoutSec": 1800
+        },
+        {
+          "id": "check:typecheck",
+          "stack": "node",
+          "args": [
+            "npx",
+            "--no-install",
+            "tsc",
+            "--noEmit",
+            "-p",
+            "tsconfig.json"
+          ],
+          "optional": true,
+          "timeoutSec": 900
+        }
+      ]
+    },
+    {
+      "id": "scripts",
+      "path": "scripts",
+      "stacks": [
+        "python"
+      ],
+      "tools": {
+        "python": {
+          "python": "python",
+          "manager": "pip"
+        }
+      },
+      "tasks": [
+        {
+          "id": "install",
+          "stack": "python",
+          "optional": true,
+          "timeoutSec": 1200,
+          "args": [
+            "python",
+            "-m",
+            "pip",
+            "install",
+            "-r",
+            "requirements.txt"
+          ]
+        },
+        {
+          "id": "check:syntax",
+          "stack": "python",
+          "args": [
+            "python",
+            "-m",
+            "compileall",
+            "."
+          ],
+          "optional": true,
+          "timeoutSec": 600
+        }
+      ]
+    },
+    {
+      "id": "tools-outlook-otp-service",
+      "path": "tools/outlook-otp-service",
+      "stacks": [
+        "python"
+      ],
+      "tools": {
+        "python": {
+          "python": "python",
+          "manager": "pip"
+        }
+      },
+      "tasks": [
+        {
+          "id": "install",
+          "stack": "python",
+          "optional": true,
+          "timeoutSec": 1200,
+          "args": [
+            "python",
+            "-m",
+            "pip",
+            "install",
+            "-r",
+            "requirements.txt"
+          ]
+        },
+        {
+          "id": "check:syntax",
+          "stack": "python",
+          "args": [
+            "python",
+            "-m",
+            "compileall",
+            "."
+          ],
+          "optional": true,
+          "timeoutSec": 600
+        },
+        {
+          "id": "check:test",
+          "stack": "python",
+          "args": [
+            "python",
+            "-m",
+            "pytest"
+          ],
+          "optional": false,
+          "timeoutSec": 1800
+        }
+      ]
+    }
+  ]
+}
