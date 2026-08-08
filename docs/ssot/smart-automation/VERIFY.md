@@ -55,9 +55,18 @@
 | XPI | PASS | `dist/openai-plus-vxt-0.0.28.xpi` |
 | Mullvad XPI | PASS | `dist/openai-plus-vxt-0.0.28-mullvad.xpi` |
 | 仓库级 spec / quality / proof | PASS | 当前请求指纹 `06ea161d70766098` 的最新 `spec.verdict`、`quality.verdict`、`verify.evidence` 均为 PASS；任务复核 5/5、0 blocking |
-| review closeout / release | BLOCKED | spec/quality/verify 均 PASS；主 transaction 仍被 295 项共享工作树变化及历史 release/deploy 收据的 clean-worktree 硬门阻断 |
+| review closeout / release | SUPERSEDED | 该 0.0.28 历史门已由下方 2026-08-08 集成交付记录取代 |
 
 本轮发布包 SHA-256：Chrome ZIP `a2c39b055a5fb2fc2712d869562c9818ff235526a8946a4cdca7b7e3b0b8739d`；Firefox XPI `9ea3f1c1cddbeb2aa6d7451337d5f9299f6ad00a475c714b7e09e021128efbba`。
+
+## 2026-08-08 SSOT 集成交付
+
+- 集成提交：`57d0c9214066348f9a7166f1a1adc54c2f1c2faf`；已合并 `codex/tpp-delivery` 的 forced-probe、完成 checkpoint 不重放和三阶段代理夹具修复。
+- 验证：TypeScript `125/125`、Saved Payment 后端 `3/3`、Chrome/Firefox 构建、三阶段代理、Plus closure、Saved Payment UI、自动化资格和资格看板夹具均通过。
+- 发布：fork `a5116107/openai-plus-vxt` 的 `main` 与 `codex/full-ssot-integration` 均指向集成提交；预发布 `v0.0.37-ssot.1` 已上传 Chrome ZIP、Firefox XPI、发布清单和回滚说明。
+- 产物 SHA-256：Chrome ZIP `4fa4db10814dd4c8514d2f357311ef100e7a2b3a3af1db31730a671a8fd74693`；Firefox XPI `5739225446632b2e613ea9185216ecdeacb30c551a29456861f6d9a5e946f008`。
+- 上游状态：`suyancc/openai-plus-vxt` 写入返回 403，当前令牌也缺少创建上游 PR 的权限；上游 `main` 仍为 `d856454f82e7fce14c35603a72e0f2f3e1ca69e9`。
+- 最新严格质量门：功能、安全与测试证据通过；总门因 184 文件迁移超过 change/shape budget，以及 `src/features/probe/analysis.ts` 等既有超大文件而保持阻塞，未伪造 PASS。
 
 ## Plus 双 Checkout 闭环
 

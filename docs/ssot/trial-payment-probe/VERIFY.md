@@ -95,7 +95,7 @@ npm run test:e2e-proxy-stages
 | 脱敏 | 高风险密钥模式扫描 + 收据归一化测试 | 无命中；不持久化 token/payload |
 | 质量复核 | `spec.verdict.latest.json`、`quality.verdict.latest.json`、`verify.evidence.latest.json` | 三项均 `pass`，0 issue |
 
-母技能 release/GitHub/deploy 总事务因共享工作树存在 301 项既有变化而停在 clean-worktree 门；该门不改写上述代码、测试、构建和规格判定，也未执行 reset、stash、clean 或提交操作。
+2026-08-08 集成交付已提交为 `57d0c92`，并推送到 fork 的集成分支与 `main`；预发布 `v0.0.37-ssot.1` 已上传。上游仓库推送和 PR 创建分别受 403 与令牌权限阻断。最新严格质量总门仍报告跨 SSOT 迁移的 change/shape budget 与既有超大文件问题；TPP 定向逻辑、125 项全量 TypeScript 测试、3 项后端测试、双端构建和自包含三阶段代理 E2E 均通过。
 
 ## 9. 隔离交付复核（2026-08-07）
 

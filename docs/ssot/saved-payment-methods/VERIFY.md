@@ -94,8 +94,9 @@
 - [x] `dist/saved-payment-rollback-0.0.37.md`：第一动作关闭 `opx.savedPaymentMethods.feature.enabled`，并回链上一 Firefox 产物。
 - [x] 生产代码 secret-shaped 扫描未发现具体 PK、client secret 或卡号 fixture；桥回包测试证明不含请求中的 PK/client secret。
 - [x] `quality-guard review-entry` 已在当前闭环请求指纹 `06ea161d70766098` 下运行：`spec.verdict`、`quality.verdict`、`verify.evidence` 均为 PASS，任务复核 5/5、0 blocking；专项 E2E 薄入口与 runner 均无 structural-quality finding。
-- [ ] workflow release/closeout 总门仍由共享脏工作树硬门拦截：当前 139 个路径、295 项 release transaction 变化，且历史 release/deploy 收据未闭合。最新 `spec.verdict`、`quality.verdict`、`verify.evidence` 均为 PASS，task reconcile 为 5/5、0 blocking；change/shape budget 与既有超大文件告警为 advisory，不覆盖本批功能、构建、UI 和 E2E 的 PASS。
-- [x] release note、GitHub sync 和 deploy inspect 收据已形成；GitHub sync 为离线 dry-run SUCCESS，deploy 因扩展项目无可识别线上部署面为 DEGRADED。主 release transaction 仍由 clean-worktree 硬门阻断。
+- [x] fork 发布已完成：`a5116107/openai-plus-vxt` 的 `main` 和集成分支均指向 `57d0c92`，预发布 `v0.0.37-ssot.1` 已上传双端产物、哈希清单和回滚说明。
+- [ ] 上游交付仍受权限门阻断：向 `suyancc/openai-plus-vxt` 推送返回 403，当前令牌也无权创建上游 PR。
+- [ ] 最新严格质量总门仍受迁移规模和结构预算阻断；功能测试、双端构建、浏览器夹具与敏感信息扫描均通过，但 change/shape budget 和既有超大文件未被标记为 PASS。
 
 命令实际通过后再勾选并记录测试数量；文件存在不计为 PASS。
 
