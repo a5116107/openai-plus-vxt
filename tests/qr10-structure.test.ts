@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
+import path from 'node:path';
 import { maskEmail, maskPhone, redactLogUrl, redactOAuthPhoneLogText } from '../src/features/oauth-phone/logging';
 import { parseCountryExitText } from '../src/features/probe/country-exit-input';
 import { buildCountryMethodRecommendations, exportMethodDetectionsCsv } from '../src/features/probe/method-report';
@@ -30,4 +32,22 @@ test('QR-10 method report remains deterministic after state extraction', () => {
   const rows = buildCountryMethodRecommendations(detections);
   assert.deepEqual(rows[0], { country: 'US', methods: ['card', 'paypal'], interestingMethods: ['paypal'], samples: 2, zeroSamples: 1, lastDetectedAt: 3, recommendedPaymentMethod: 'paypal', note: '推荐 paypal（基于 2 次探测到的支持方式）' });
   assert.match(exportMethodDetectionsCsv(detections), /detectedAt,country/);
+});
+
+test('QR-11 browser markup uses the shared DOM mount and Firefox contract is compatible', () => {
+  const repoRoot = path.resolve(import.meta.dirname, '..');
+  const sourceFiles = [
+    'entrypoints/automation-settings/main.ts',
+    'entrypoints/operations-console/main.ts',
+    'src/app/panel.ts',
+    'src/features/payment/panel.ts',
+  ];
+  for (const relativePath of sourceFiles) {
+    const source = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+    assert.doesNotMatch(source, /\.innerHTML\s*=/, relativePath);
+    assert.match(source, /setElementHtml\(/, relativePath);
+  }
+  const manifestConfig = fs.readFileSync(path.join(repoRoot, 'wxt.config.ts'), 'utf8');
+  assert.match(manifestConfig, /strict_min_version:\s*'142\.0'/);
+  assert.match(manifestConfig, /data_collection_permissions/);
 });

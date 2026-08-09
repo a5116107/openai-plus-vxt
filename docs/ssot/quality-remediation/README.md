@@ -34,3 +34,9 @@
 - `scripts/guardrails/package.json` 将 guardrail `.js` 限定为 CommonJS，消除了根包 ESM 导致的 `require is not defined` 连锁失败。
 - `quality-guard review-entry --no-chain` 返回 SUCCESS；spec、quality、verify-evidence、proof bundle 和 review loop blocker 均为 0。
 - TypeScript、125 项测试、3 项后端测试、双端构建、三阶段出口 E2E 和 Plus Closure fixture 全部通过。
+
+## 2026-08-09 QR-11 收口
+
+- 新增 `src/app/dom.ts`，所有入口和支付/面板的 HTML 挂载统一走 `DOMParser + replaceChildren`；源码不再直接赋值动态 `innerHTML`。
+- Firefox manifest `strict_min_version` 提升至 `142.0`，与 `data_collection_permissions.required=['none']` 的 Firefox/Android 支持契约一致。
+- `pnpm compile`、135/135 全量测试、3/3 Saved Payment 后端、Chrome/Firefox 构建、`web-ext lint`（0 errors / 0 notices / 0 warnings）、运营控制台、资格看板、三阶段出口和 Plus Closure fixture 均通过。

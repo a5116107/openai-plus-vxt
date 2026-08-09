@@ -24,7 +24,7 @@ interface PanelOptions {
 }
 
 export function createPanel(root: ShadowRoot, registerController: RegisterController, options: PanelOptions = {}): void {
-  root.innerHTML = '';
+  setElementHtml(root, '');
   const isSidePanel = options.surface === 'sidepanel';
 
   const style = document.createElement('style');
@@ -258,3 +258,4 @@ function createTab(tab: FeatureTab, label: string): HTMLButtonElement {
   button.textContent = label;
   return button;
 }
+import { setElementHtml } from './dom';

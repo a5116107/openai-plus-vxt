@@ -106,7 +106,7 @@ export function createPaymentPanel(container: HTMLElement): FeaturePanelHandle {
   const renderLocalState = async () => {
     const state = await loadSavedPaymentState();
     const account = session?.accountId ? state.accounts[session.accountId] : undefined;
-    methodList.innerHTML = '';
+    setElementHtml(methodList, '');
     if (!account?.paymentMethods.length) {
       methodList.append(emptyRow('当前账号没有已复核的保存方式'));
     } else {
@@ -146,7 +146,7 @@ export function createPaymentPanel(container: HTMLElement): FeaturePanelHandle {
   };
 
   const renderPolicies = () => {
-    policyList.innerHTML = '';
+    setElementHtml(policyList, '');
     const groups = [
       { label: '商户保存', methods: ['card', 'paypal', 'bank_debit', 'bank_redirect', 'upi'] },
       { label: '钱包管理', methods: ['apple_pay', 'google_pay', 'link'] },
@@ -390,3 +390,4 @@ function policyStatusLabel(status: string): string {
   if (status === 'probe-required') return '待实证';
   return '不进入保存';
 }
+import { setElementHtml } from '../../app/dom';

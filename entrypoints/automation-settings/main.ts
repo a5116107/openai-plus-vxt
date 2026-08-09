@@ -1,5 +1,6 @@
 import './style.css';
 
+import { setElementHtml } from '../../src/app/dom';
 import { loadAutomationState } from '../../src/app/state';
 import { flashButtonLabel, setButtonPending } from '../../src/app/button-feedback';
 import {
@@ -148,7 +149,7 @@ async function render(): Promise<void> {
   const isPhoneRegistration = registrationMode === 'phone';
   const effectiveOAuthExtractMode = isPhoneRegistration ? 'direct' : state.settings.oauthExtractMode;
 
-  app!.innerHTML = `
+  setElementHtml(app!, `
     <section class="page">
       <div class="topbar">
         <div>
@@ -1443,7 +1444,7 @@ async function render(): Promise<void> {
         </details>
       </div>
     </section>
-  `;
+  `);
 
   const status = mustGet('status');
   const rawEmailsInput = mustGet('raw-emails') as HTMLTextAreaElement;
@@ -1796,17 +1797,17 @@ const clearSmsButton = mustGet('btn-clear-sms') as HTMLButtonElement;
 
     const syncOffers = (message = ''): void => {
       summary.textContent = selectedOffers.length ? `${selectedOffers.length} 个报价` : '未选择报价';
-      offersHost.innerHTML = renderOAuthPhoneOfferTable(
+      setElementHtml(offersHost, renderOAuthPhoneOfferTable(
         currentOffers,
         selectedOffers,
         message,
         readOAuthOfferTableFilter(),
-      );
+      ));
     };
     const syncApiTargets = (): void => {
       const parsed = parseOAuthPhoneApiTargets(rawApiTargetsInput.value, currentApiTargets);
       currentApiTargets = parsed.targets;
-      apiTargetsHost.innerHTML = renderOAuthPhoneApiTargetTable(rawApiTargetsInput.value, currentApiTargets);
+      setElementHtml(apiTargetsHost, renderOAuthPhoneApiTargetTable(rawApiTargetsInput.value, currentApiTargets));
       const error = parsed.errors.join('；');
       if (error) {
         setInlineStatus(status, error, 'error');
@@ -1872,7 +1873,7 @@ const clearSmsButton = mustGet('btn-clear-sms') as HTMLButtonElement;
               lastMessage: '已恢复可用',
             }
           : item);
-        apiTargetsHost.innerHTML = renderOAuthPhoneApiTargetTable(rawApiTargetsInput.value, currentApiTargets);
+        setElementHtml(apiTargetsHost, renderOAuthPhoneApiTargetTable(rawApiTargetsInput.value, currentApiTargets));
         setInlineStatus(status, `已恢复 OAuth API 接码：${target.phone}，点击保存后生效。`, 'ok');
         flashButtonLabel(button, '已恢复');
       }
@@ -1907,7 +1908,7 @@ const clearSmsButton = mustGet('btn-clear-sms') as HTMLButtonElement;
 
     refreshOffersButton.addEventListener('click', async () => {
       const restoreButton = setButtonPending(refreshOffersButton, '查询中...');
-      offersHost.innerHTML = '<div class="table-empty">正在查询各平台可用报价...</div>';
+      setElementHtml(offersHost, '<div class="table-empty">正在查询各平台可用报价...</div>');
       try {
         await saveCurrentOAuthPhoneSettings({ selectedOffers, countryIds: selectedOffers.map((offer) => offer.countryId) });
         const result = await fetchOAuthPhoneOfferMatrix();
@@ -2006,7 +2007,7 @@ const clearSmsButton = mustGet('btn-clear-sms') as HTMLButtonElement;
 
     const table = document.createElement('table');
     table.className = 'data-table email-pool-table';
-    table.innerHTML = `
+    setElementHtml(table, `
       <thead>
         <tr>
           <th class="index-cell">序号</th>
@@ -2016,11 +2017,11 @@ const clearSmsButton = mustGet('btn-clear-sms') as HTMLButtonElement;
           <th>操作</th>
         </tr>
       </thead>
-    `;
+    `);
     const body = document.createElement('tbody');
     rows.forEach(({ email, statusInfo }, index) => {
       const row = document.createElement('tr');
-      row.innerHTML = `
+      setElementHtml(row, `
         <td class="index-cell">${index + 1}</td>
         <td><span class="email-text">${escapeHtml(email.email)}</span></td>
         <td><span class="credential-text">${escapeHtml(maskCredentialLine(email.rawInput))}</span></td>
@@ -2040,7 +2041,7 @@ const clearSmsButton = mustGet('btn-clear-sms') as HTMLButtonElement;
             <button class="table-action-button danger" data-action="delete" type="button">删除</button>
           </div>
         </td>
-      `;
+      `);
       row.querySelector<HTMLButtonElement>('[data-action="restore"]')?.addEventListener('click', async (event) => {
         const button = event.currentTarget as HTMLButtonElement;
         const restoreButton = setButtonPending(button, '恢复中...');
@@ -2117,7 +2118,7 @@ const clearSmsButton = mustGet('btn-clear-sms') as HTMLButtonElement;
 
     const table = document.createElement('table');
     table.className = 'data-table sms-pool-table';
-    table.innerHTML = `
+    setElementHtml(table, `
       <thead>
         <tr>
           <th>来源</th>
@@ -2127,12 +2128,12 @@ const clearSmsButton = mustGet('btn-clear-sms') as HTMLButtonElement;
           <th>操作</th>
         </tr>
       </thead>
-    `;
+    `);
     const body = document.createElement('tbody');
     for (const target of preview.smsTargets) {
       const statusInfo = smsStatusInfo(target, state.run.selectedSmsId);
       const row = document.createElement('tr');
-      row.innerHTML = `
+      setElementHtml(row, `
         <td><span class="provider-badge ${target.source === 'foxsms' ? 'provider-badge-foxsms' : 'provider-badge-smsbower'}">${target.source === 'foxsms' ? 'Fox SMS' : 'API'}</span></td>
         <td><span class="email-text">${escapeHtml(target.phone)}</span></td>
         <td><span class="credential-text api-text">${escapeHtml(smsTargetSourceDetail(target))}</span></td>
@@ -2143,7 +2144,7 @@ const clearSmsButton = mustGet('btn-clear-sms') as HTMLButtonElement;
             <button class="table-action-button danger" data-action="delete" type="button">删除</button>
           </div>
         </td>
-      `;
+      `);
       row.querySelector<HTMLButtonElement>('[data-action="restore"]')?.addEventListener('click', async (event) => {
         const button = event.currentTarget as HTMLButtonElement;
         const restoreButton = setButtonPending(button, '恢复中...');
@@ -3515,12 +3516,12 @@ async function loadCountryExitTextarea(): Promise<void> {
 function renderProbeCountries(selected: string[]): void {
   const host = mustGet('probe-country-grid');
   const selectedSet = new Set(selected.map((item) => item.toUpperCase()));
-  host.innerHTML = listProbeCountries().map((item) => `
+  setElementHtml(host, listProbeCountries().map((item) => `
     <label class="probe-country-item">
       <input type="checkbox" data-probe-country="${item.country}" ${selectedSet.has(item.country) ? 'checked' : ''} />
       <span>${item.country} <small>${item.currency}</small></span>
     </label>
-  `).join('');
+  `).join(''));
   mustGet('probe-country-count').textContent = String(selectedSet.size);
   host.querySelectorAll('input[data-probe-country]').forEach((input) => {
     input.addEventListener('change', () => {
@@ -3533,31 +3534,31 @@ function renderProbeCountries(selected: string[]): void {
 function renderProbeChannels(selected: string[]): void {
   const host = mustGet('probe-channel-row');
   const selectedSet = new Set(selected.map((item) => item.toLowerCase()));
-  host.innerHTML = PROBE_CHANNELS.map((channel) => `
+  setElementHtml(host, PROBE_CHANNELS.map((channel) => `
     <label class="probe-channel-item">
       <input type="checkbox" data-probe-channel="${channel}" ${selectedSet.has(channel) ? 'checked' : ''} />
       <span>${channel}</span>
     </label>
-  `).join('');
+  `).join(''));
 }
 
 function renderProbeStats(stats: Array<{ country: string; channel: string; attempts: number; hits: number; errors: number; lastHitAt: number }>): void {
   const host = mustGet('probe-stats-table');
   if (!stats.length) {
-    host.innerHTML = '<div class="table-empty">暂无统计，先跑一轮探测</div>';
+    setElementHtml(host, '<div class="table-empty">暂无统计，先跑一轮探测</div>');
     return;
   }
   const rows = [...stats].sort((a, b) => (b.hits - a.hits) || (b.attempts - a.attempts) || a.country.localeCompare(b.country)).slice(0, 100);
-  host.innerHTML = `<table class="data-table"><thead><tr><th>国家</th><th>通道</th><th>尝试</th><th>命中</th><th>失败</th><th>命中率</th><th>最近</th></tr></thead><tbody>${rows.map((row) => { const rate = row.attempts ? Math.round((row.hits / row.attempts) * 100) : 0; return `<tr><td>${escapeHtml(row.country)}</td><td>${escapeHtml(row.channel)}</td><td>${row.attempts}</td><td>${row.hits}</td><td>${row.errors}</td><td>${rate}%</td><td>${row.lastHitAt ? new Date(row.lastHitAt).toLocaleString() : '-'}</td></tr>`; }).join('')}</tbody></table>`;
+  setElementHtml(host, `<table class="data-table"><thead><tr><th>国家</th><th>通道</th><th>尝试</th><th>命中</th><th>失败</th><th>命中率</th><th>最近</th></tr></thead><tbody>${rows.map((row) => { const rate = row.attempts ? Math.round((row.hits / row.attempts) * 100) : 0; return `<tr><td>${escapeHtml(row.country)}</td><td>${escapeHtml(row.channel)}</td><td>${row.attempts}</td><td>${row.hits}</td><td>${row.errors}</td><td>${rate}%</td><td>${row.lastHitAt ? new Date(row.lastHitAt).toLocaleString() : '-'}</td></tr>`; }).join('')}</tbody></table>`);
 }
 
 function renderProbeHealth(items: Array<{ country: string; status: string; latencyMs: number; endpointSummary: string; message: string; actualIp?: string; actualCountry?: string; asn?: string; asOrganization?: string; ipVersion?: string; networkType?: string }>): void {
   const host = mustGet('probe-health-table');
   if (!items.length) {
-    host.innerHTML = '<div class="table-empty">尚未检查，点击“检查出口健康”</div>';
+    setElementHtml(host, '<div class="table-empty">尚未检查，点击“检查出口健康”</div>');
     return;
   }
-  host.innerHTML = `<table class="data-table"><thead><tr><th>目标国家</th><th>状态</th><th>延迟</th><th>实际出口</th><th>ASN/网络</th><th>代理端点</th><th>详情</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item.country)}</td><td><span class="status-pill" data-status="${escapeAttr(item.status === 'ok' ? 'success' : item.status === 'fail' ? 'error' : 'idle')}">${escapeHtml(item.status)}</span></td><td>${item.latencyMs ? `${item.latencyMs}ms` : '-'}</td><td>${escapeHtml([item.actualIp, item.actualCountry, item.ipVersion].filter(Boolean).join(' / ') || '-')}</td><td>${escapeHtml([item.asn, item.asOrganization, item.networkType].filter(Boolean).join(' / ') || '-')}</td><td>${escapeHtml(item.endpointSummary)}</td><td>${escapeHtml(item.message)}</td></tr>`).join('')}</tbody></table>`;
+  setElementHtml(host, `<table class="data-table"><thead><tr><th>目标国家</th><th>状态</th><th>延迟</th><th>实际出口</th><th>ASN/网络</th><th>代理端点</th><th>详情</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item.country)}</td><td><span class="status-pill" data-status="${escapeAttr(item.status === 'ok' ? 'success' : item.status === 'fail' ? 'error' : 'idle')}">${escapeHtml(item.status)}</span></td><td>${item.latencyMs ? `${item.latencyMs}ms` : '-'}</td><td>${escapeHtml([item.actualIp, item.actualCountry, item.ipVersion].filter(Boolean).join(' / ') || '-')}</td><td>${escapeHtml([item.asn, item.asOrganization, item.networkType].filter(Boolean).join(' / ') || '-')}</td><td>${escapeHtml(item.endpointSummary)}</td><td>${escapeHtml(item.message)}</td></tr>`).join('')}</tbody></table>`);
 }
 
 function renderProbeRunCenter(task: ProbeTask | null): void {
@@ -3566,7 +3567,7 @@ function renderProbeRunCenter(task: ProbeTask | null): void {
   if (!summary || !host) return;
   if (!task) {
     summary.textContent = '尚未创建任务';
-    host.innerHTML = '<div class="table-empty">创建并运行任务后显示逐账号进度。</div>';
+    setElementHtml(host, '<div class="table-empty">创建并运行任务后显示逐账号进度。</div>');
     return;
   }
   const runtime = task.runtime;
@@ -3585,7 +3586,7 @@ function renderProbeRunCenter(task: ProbeTask | null): void {
     durationMs ? `耗时 ${formatDuration(durationMs)}` : '',
   ].filter(Boolean).join(' · ');
   if (!units.length) {
-    host.innerHTML = '<div class="table-empty">当前任务还没有运行单元。</div>';
+    setElementHtml(host, '<div class="table-empty">当前任务还没有运行单元。</div>');
     return;
   }
   const grouped = new Map<string, ProbeTaskUnitRuntime[]>();
@@ -3594,7 +3595,7 @@ function renderProbeRunCenter(task: ProbeTask | null): void {
     list.push(unit);
     grouped.set(unit.accountId, list);
   }
-  host.innerHTML = [...grouped.entries()].map(([accountId, rows]) => {
+  setElementHtml(host, [...grouped.entries()].map(([accountId, rows]) => {
     const done = rows.filter((row) => !['planned', 'running'].includes(row.status)).length;
     const hits = rows.filter((row) => row.status === 'hit').length;
     const errors = rows.filter((row) => row.status === 'error').length;
@@ -3611,7 +3612,7 @@ function renderProbeRunCenter(task: ProbeTask | null): void {
         </tr>`).join('')}
       </tbody></table>
     </details>`;
-  }).join('');
+  }).join(''));
 }
 
 function formatDuration(durationMs: number): string {
@@ -3624,10 +3625,10 @@ function formatDuration(durationMs: number): string {
 function renderProbeHits(hits: ProbeHitRecord[]): void {
   const host = mustGet('probe-hit-table');
   if (!hits.length) {
-    host.innerHTML = '<div class="table-empty">暂无命中</div>';
+    setElementHtml(host, '<div class="table-empty">暂无命中</div>');
     return;
   }
-  host.innerHTML = `
+  setElementHtml(host, `
     <table class="data-table">
       <thead>
         <tr>
@@ -3660,7 +3661,7 @@ function renderProbeHits(hits: ProbeHitRecord[]): void {
         `; }).join('')}
       </tbody>
     </table>
-  `;
+  `);
   host.querySelectorAll('[data-copy-hit]').forEach((button) => {
     button.addEventListener('click', async () => {
       const link = (button as HTMLElement).getAttribute('data-copy-hit') || '';
@@ -3716,10 +3717,10 @@ function renderProbeHitDatabase(
 
   const host = mustGet('probe-hitdb-table');
   if (!rows.length) {
-    host.innerHTML = '<div class="table-empty">命中库暂无匹配记录</div>';
+    setElementHtml(host, '<div class="table-empty">命中库暂无匹配记录</div>');
     return;
   }
-  host.innerHTML = `
+  setElementHtml(host, `
     <table class="data-table">
       <thead>
         <tr>
@@ -3756,7 +3757,7 @@ function renderProbeHitDatabase(
         `; }).join('')}
       </tbody>
     </table>
-  `;
+  `);
   host.querySelectorAll('[data-copy-hitdb]').forEach((button) => {
     button.addEventListener('click', async () => {
       const link = (button as HTMLElement).getAttribute('data-copy-hitdb') || '';
@@ -3826,7 +3827,7 @@ function renderProbeAccountReport(state: ProbeState | null = latestProbeState, r
   const summaryEl = mustGet('probe-account-report-summary');
   if (!state && !reportInput) {
     summaryEl.textContent = '账号报表未加载';
-    host.innerHTML = '<div class="table-empty">暂无账号数据</div>';
+    setElementHtml(host, '<div class="table-empty">暂无账号数据</div>');
     return;
   }
   const allRows = reportInput || buildAccountEligibilityReport(state as ProbeState);
@@ -3859,7 +3860,7 @@ function renderProbeAccountReport(state: ProbeState | null = latestProbeState, r
     `总命中 ${allRows.reduce((sum, row) => sum + row.hitCount, 0)}`,
   ].join(' · ');
   if (!rows.length) {
-    host.innerHTML = '<div class="table-empty">暂无账号报表</div>';
+    setElementHtml(host, '<div class="table-empty">暂无账号报表</div>');
     return;
   }
   const pageCount = Math.max(1, Math.ceil(rows.length / PROBE_ACCOUNT_REPORT_PAGE_SIZE));
@@ -3872,7 +3873,7 @@ function renderProbeAccountReport(state: ProbeState | null = latestProbeState, r
   const next = document.getElementById('btn-probe-account-next') as HTMLButtonElement | null;
   if (prev) prev.disabled = probeAccountReportPage <= 1;
   if (next) next.disabled = probeAccountReportPage >= pageCount;
-  host.innerHTML = `
+  setElementHtml(host, `
     <table class="data-table">
       <thead>
         <tr>
@@ -3907,7 +3908,7 @@ function renderProbeAccountReport(state: ProbeState | null = latestProbeState, r
         `).join('')}
       </tbody>
     </table>
-  `;
+  `);
   host.querySelectorAll('[data-copy-account-link]').forEach((button) => {
     button.addEventListener('click', async () => {
       const link = (button as HTMLElement).getAttribute('data-copy-account-link') || '';
@@ -3991,15 +3992,15 @@ function renderProbeFactorBoard(state: ProbeState | null = latestProbeState): vo
     summaryEl.textContent = '尚未积累逐次实验观测';
     qualityEl.textContent = '证据质量尚未评估';
     runnerEl.textContent = '支付 Runner 尚无观测';
-    conclusionHost.innerHTML = '';
-    factorHost.innerHTML = '<div class="table-empty">运行探测后自动生成因素分层</div>';
-    driftHost.innerHTML = '<div class="table-empty">暂无漂移样本</div>';
-    adaptiveHost.innerHTML = '<div class="table-empty">暂无实验建议</div>';
+    setElementHtml(conclusionHost, '');
+    setElementHtml(factorHost, '<div class="table-empty">运行探测后自动生成因素分层</div>');
+    setElementHtml(driftHost, '<div class="table-empty">暂无漂移样本</div>');
+    setElementHtml(adaptiveHost, '<div class="table-empty">暂无实验建议</div>');
     matrixSummary.textContent = '尚未建立账号×出口矩阵';
-    matrixHost.innerHTML = '<div class="table-empty">启用平衡研究模式并运行探测后生成覆盖矩阵</div>';
-    controlledHost.innerHTML = '<div class="table-empty">尚无可匹配的交叉样本</div>';
-    confoundingHost.innerHTML = '<div class="table-empty">尚无变量绑定审计结果</div>';
-    powerHost.innerHTML = '<div class="table-empty">尚无明确结果用于功效估算</div>';
+    setElementHtml(matrixHost, '<div class="table-empty">启用平衡研究模式并运行探测后生成覆盖矩阵</div>');
+    setElementHtml(controlledHost, '<div class="table-empty">尚无可匹配的交叉样本</div>');
+    setElementHtml(confoundingHost, '<div class="table-empty">尚无变量绑定审计结果</div>');
+    setElementHtml(powerHost, '<div class="table-empty">尚无明确结果用于功效估算</div>');
     return;
   }
   const coverage = state.experimentCoverage;
@@ -4090,7 +4091,7 @@ function renderProbeFactorBoard(state: ProbeState | null = latestProbeState): vo
     coverage.evidenceReady ? '结论门槛已满足' : '结论保持证据不足',
   ].join(' · ') : '尚未建立账号×出口矩阵';
   const incompleteCells = (coverage?.cells || []).filter((cell) => cell.status !== 'complete');
-  matrixHost.innerHTML = coverage?.totalCells ? `
+  setElementHtml(matrixHost, coverage?.totalCells ? `
     <table class="data-table"><thead><tr><th>账号</th><th>出口国家</th><th>样本</th><th>时间跨度</th><th>状态</th><th>下次可测</th></tr></thead>
     <tbody>${(incompleteCells.length ? incompleteCells : coverage.cells).slice(0, 160).map((cell) => `<tr>
       <td>${escapeHtml(shortFactorValue(cell.accountId))}</td><td>${escapeHtml(cell.country)}</td>
@@ -4098,14 +4099,14 @@ function renderProbeFactorBoard(state: ProbeState | null = latestProbeState): vo
       <td><span class="status-pill" data-status="${escapeAttr(cell.status === 'complete' ? 'success' : cell.status === 'ready' || cell.status === 'missing' ? 'running' : 'idle')}">${escapeHtml(cell.status)}</span></td>
       <td>${cell.nextEligibleAt > Date.now() ? new Date(cell.nextEligibleAt).toLocaleString() : '-'}</td>
     </tr>`).join('')}</tbody></table>
-  ` : '<div class="table-empty">当前任务尚未形成有效矩阵</div>';
-  conclusionHost.innerHTML = report.conclusions.map((item) => `
+  ` : '<div class="table-empty">当前任务尚未形成有效矩阵</div>');
+  setElementHtml(conclusionHost, report.conclusions.map((item) => `
     <div class="probe-factor-conclusion" data-evidence="${escapeAttr(item.evidence)}">
       <strong>${escapeHtml(factorConclusionLabel(item.factor))}</strong>
       <span>${escapeHtml(item.message)}</span>
     </div>
-  `).join('');
-  controlledHost.innerHTML = report.controlledEffects?.length ? `
+  `).join(''));
+  setElementHtml(controlledHost, report.controlledEffects?.length ? `
     <table class="data-table"><thead><tr><th>待检因素</th><th>控制变量</th><th>对照</th><th>匹配层/样本</th><th>调整后差值</th><th>方向一致</th><th>证据</th><th>结论</th></tr></thead>
     <tbody>${report.controlledEffects.map((effect) => `<tr>
       <td>${escapeHtml(factorDimensionLabel(effect.treatmentDimension))}</td>
@@ -4117,28 +4118,28 @@ function renderProbeFactorBoard(state: ProbeState | null = latestProbeState): vo
       <td><span class="status-pill" data-status="${escapeAttr(effect.evidence === 'strong' ? 'success' : effect.evidence === 'moderate' || effect.evidence === 'weak' ? 'running' : 'idle')}">${escapeHtml(effect.evidence)}</span></td>
       <td>${escapeHtml(effect.message)}</td>
     </tr>`).join('')}</tbody></table>
-  ` : '<div class="table-empty">尚无匹配对照结果</div>';
-  confoundingHost.innerHTML = report.confoundingFindings?.length ? `
+  ` : '<div class="table-empty">尚无匹配对照结果</div>');
+  setElementHtml(confoundingHost, report.confoundingFindings?.length ? `
     <table class="data-table"><thead><tr><th>变量 A</th><th>变量 B</th><th>绑定关系</th><th>依赖度</th><th>样本</th><th>影响</th></tr></thead>
     <tbody>${report.confoundingFindings.map((finding) => `<tr>
       <td>${escapeHtml(factorDimensionLabel(finding.dimensionA))}</td><td>${escapeHtml(factorDimensionLabel(finding.dimensionB))}</td>
       <td>${escapeHtml(finding.relationship)}</td><td>${finding.dependencyPercent}%</td><td>${finding.samples}</td>
       <td><span class="status-pill" data-status="${escapeAttr(finding.level === 'critical' ? 'error' : 'running')}">${escapeHtml(finding.message)}</span></td>
     </tr>`).join('')}</tbody></table>
-  ` : '<div class="table-empty">未发现达到 95% 阈值的变量绑定</div>';
+  ` : '<div class="table-empty">未发现达到 95% 阈值的变量绑定</div>');
   const powerPlan = report.powerPlan;
-  powerHost.innerHTML = powerPlan?.targets?.length ? `
+  setElementHtml(powerHost, powerPlan?.targets?.length ? `
     <div class="pool-summary">基准资格率 ${powerPlan.baselineRate}% · α=${powerPlan.alpha} · 功效 ${(powerPlan.power * 100).toFixed(0)}% · ${escapeHtml(powerPlan.message)}</div>
     <table class="data-table"><thead><tr><th>目标差异</th><th>每组所需</th><th>总样本目标</th><th>当前明确结果</th><th>进度</th><th>尚缺</th></tr></thead>
     <tbody>${powerPlan.targets.map((target) => `<tr><td>${target.effectPercentPoints}pp</td><td>${target.requiredPerGroup}</td><td>${target.requiredTotal}</td><td>${target.currentResolved}</td><td>${target.progressPercent}%</td><td>${target.remainingSamples}</td></tr>`).join('')}</tbody></table>
-  ` : '<div class="table-empty">明确结果不足</div>';
+  ` : '<div class="table-empty">明确结果不足</div>');
   const rows = report.rows
     .filter((row) => row.attempts >= Math.min(report.minSamples, 2))
     .sort((a, b) => factorDimensionPriority(a.dimension) - factorDimensionPriority(b.dimension)
       || b.confidenceLow - a.confidenceLow
       || b.attempts - a.attempts)
     .slice(0, 160);
-  factorHost.innerHTML = rows.length ? `
+  setElementHtml(factorHost, rows.length ? `
     <table class="data-table"><thead><tr><th>因素</th><th>取值</th><th>样本</th><th>命中</th><th>错误</th><th>命中率</th><th>95%区间</th><th>相对总体</th><th>置信度</th></tr></thead>
     <tbody>${rows.map((row) => `<tr>
       <td>${escapeHtml(factorDimensionLabel(row.dimension))}</td>
@@ -4148,10 +4149,10 @@ function renderProbeFactorBoard(state: ProbeState | null = latestProbeState): vo
       <td>${row.liftPercentPoints >= 0 ? '+' : ''}${row.liftPercentPoints}pp</td>
       <td><span class="status-pill" data-status="${escapeAttr(row.confidence === 'high' ? 'success' : row.confidence === 'insufficient' ? 'idle' : 'running')}">${escapeHtml(row.confidence)}</span></td>
     </tr>`).join('')}</tbody></table>
-  ` : '<div class="table-empty">分组样本不足</div>';
+  ` : '<div class="table-empty">分组样本不足</div>');
 
   const alerts = state.driftAlerts || [];
-  driftHost.innerHTML = alerts.length ? `
+  setElementHtml(driftHost, alerts.length ? `
     <table class="data-table"><thead><tr><th>级别</th><th>类型</th><th>因素</th><th>取值</th><th>基线</th><th>近期</th><th>变化</th><th>结论</th></tr></thead>
     <tbody>${alerts.slice(0, 100).map((alert) => `<tr>
       <td><span class="status-pill" data-status="${escapeAttr(alert.level === 'critical' ? 'error' : alert.level === 'warning' ? 'running' : 'idle')}">${escapeHtml(alert.level)}</span></td>
@@ -4160,24 +4161,24 @@ function renderProbeFactorBoard(state: ProbeState | null = latestProbeState): vo
       <td>${alert.recentValue}${alert.kind.includes('rate') ? '%' : ''} / n=${alert.recentSamples}</td>
       <td>${alert.delta >= 0 ? '+' : ''}${alert.delta}${alert.kind.includes('rate') ? 'pp' : ''}</td><td>${escapeHtml(alert.message)}</td>
     </tr>`).join('')}</tbody></table>
-  ` : '<div class="table-empty">近期窗口与历史基线未发现达到阈值的变化</div>';
+  ` : '<div class="table-empty">近期窗口与历史基线未发现达到阈值的变化</div>');
 
   const recommendations = state.adaptiveRecommendations || [];
-  adaptiveHost.innerHTML = recommendations.length ? `
+  setElementHtml(adaptiveHost, recommendations.length ? `
     <table class="data-table"><thead><tr><th>优先级</th><th>因素</th><th>取值</th><th>当前样本</th><th>目标样本</th><th>原因</th></tr></thead>
     <tbody>${recommendations.slice(0, 100).map((item) => `<tr>
       <td><span class="status-pill" data-status="${escapeAttr(item.priority === 'urgent' ? 'error' : item.priority === 'high' ? 'running' : 'idle')}">${escapeHtml(item.priority)}</span></td>
       <td>${escapeHtml(factorDimensionLabel(item.dimension))}</td><td>${escapeHtml(shortFactorValue(item.value))}</td>
       <td>${item.currentSamples}</td><td>${item.targetSamples}</td><td>${escapeHtml(item.reason)}</td>
     </tr>`).join('')}</tbody></table>
-  ` : '<div class="table-empty">当前样本覆盖已达到最低要求</div>';
+  ` : '<div class="table-empty">当前样本覆盖已达到最低要求</div>');
 }
 
 function renderProbeReadiness(state: ProbeState | null, summary: HTMLElement, host: HTMLElement): void {
   const readiness = state?.experimentReadiness;
   if (!readiness) {
     summary.textContent = '尚未评估账号与出口条件';
-    host.innerHTML = '<div class="table-empty">刷新状态后生成实验门禁</div>';
+    setElementHtml(host, '<div class="table-empty">刷新状态后生成实验门禁</div>');
     return;
   }
   summary.textContent = [
@@ -4197,14 +4198,14 @@ function renderProbeReadiness(state: ProbeState | null, summary: HTMLElement, ho
     account: '账号', country: '国家', 'exit-ip': '出口 IP', 'exit-asn': '出口 ASN',
     'time-randomness': '跨时段/随机性', route: '三阶段路由', 'payment-method': '支付方式',
   };
-  host.innerHTML = readiness.items.length ? `
+  setElementHtml(host, readiness.items.length ? `
     <table><thead><tr><th>因素</th><th>状态</th><th>水平</th><th>匹配层</th><th>样本</th><th>判定条件</th></tr></thead><tbody>${readiness.items.map((item) => `<tr>
       <td>${escapeHtml(factorLabel[item.factor] || item.factor)}</td>
       <td>${escapeHtml(statusLabel[item.status] || item.status)}</td>
       <td>${item.levels}</td><td>${item.matchedStrata}</td><td>${item.samples}</td>
       <td>${escapeHtml(item.message)}</td>
     </tr>`).join('')}</tbody></table>
-  ` : '<div class="table-empty">尚无可识别性结果</div>';
+  ` : '<div class="table-empty">尚无可识别性结果</div>');
 }
 
 function factorDimensionLabel(value: string): string {
@@ -4280,14 +4281,14 @@ function renderProbeMethodsBoard(state: ProbeState | null = latestProbeState): v
   const summaryEl = mustGet('probe-methods-summary');
   if (!state) {
     summaryEl.textContent = '尚未加载方式探测结果';
-    host.innerHTML = '<div class="table-empty">暂无数据</div>';
+    setElementHtml(host, '<div class="table-empty">暂无数据</div>');
     return;
   }
   const detections = state.methodDetections || [];
   const recommendations = buildCountryMethodRecommendations(detections);
   summaryEl.textContent = `探测记录 ${detections.length} · 覆盖国家 ${recommendations.length} · 仅展示探测到的支持方式`;
   if (!recommendations.length) {
-    host.innerHTML = '<div class="table-empty">暂无方式探测结果。请开启“探测 payment_method_types”后跑一轮。</div>';
+    setElementHtml(host, '<div class="table-empty">暂无方式探测结果。请开启“探测 payment_method_types”后跑一轮。</div>');
     return;
   }
   const head = '<table class="data-table"><thead><tr><th>国家</th><th>推荐方式</th><th>支持方式（探测）</th><th>样本</th><th>0元样本</th><th>最近探测</th><th>说明</th></tr></thead><tbody>';
@@ -4303,7 +4304,7 @@ function renderProbeMethodsBoard(state: ProbeState | null = latestProbeState): v
       <td>${escapeHtml(item.note)}</td>
     </tr>`;
   }).join('');
-  host.innerHTML = `${head}${body}</tbody></table>`;
+  setElementHtml(host, `${head}${body}</tbody></table>`);
 }
 
 function downloadTextFile(filename: string, content: string, mime = 'text/csv;charset=utf-8'): void {
@@ -4332,7 +4333,7 @@ function renderProbeRecommendBoard(state: ProbeState | null = latestProbeState):
   const summaryEl = mustGet('probe-plan-summary');
   if (!state) {
     summaryEl.textContent = '尚未加载探测状态';
-    host.innerHTML = '<div class="table-empty">暂无推荐</div>';
+    setElementHtml(host, '<div class="table-empty">暂无推荐</div>');
     return;
   }
   const config = normalizeTaskConfig({
@@ -4367,11 +4368,11 @@ function renderProbeRecommendBoard(state: ProbeState | null = latestProbeState):
   ].filter(Boolean).join(' · ');
 
   if (!ranked.length) {
-    host.innerHTML = '<div class="table-empty">暂无统计，先跑一轮或检查健康后再预览</div>';
+    setElementHtml(host, '<div class="table-empty">暂无统计，先跑一轮或检查健康后再预览</div>');
     return;
   }
   const activeSet = new Set(plan.countries);
-  host.innerHTML = `
+  setElementHtml(host, `
     <table class="data-table">
       <thead>
         <tr>
@@ -4402,7 +4403,7 @@ function renderProbeRecommendBoard(state: ProbeState | null = latestProbeState):
         `).join('')}
       </tbody>
     </table>
-  `;
+  `);
 }
 
 function collectProbeCountries(): string[] {
@@ -5121,10 +5122,10 @@ function renderRunLogStream(events: Array<Record<string, unknown>>): void {
   }
   runLogLastRenderKey = key;
   if (!rows.length) {
-    host.innerHTML = '<div class="table-empty">暂无运行日志。启动探测后将在此实时滚动。</div>';
+    setElementHtml(host, '<div class="table-empty">暂无运行日志。启动探测后将在此实时滚动。</div>');
     return;
   }
-  host.innerHTML = rows.map((item) => {
+  setElementHtml(host, rows.map((item) => {
     const level = String(item.level || 'info');
     const ts = Number(item.ts || 0);
     const time = ts ? new Date(ts).toLocaleTimeString('zh-CN', { hour12: false }) : '--:--:--';
@@ -5143,7 +5144,7 @@ function renderRunLogStream(events: Array<Record<string, unknown>>): void {
       <span class="runlog-stage">${stage}</span>
       <span class="runlog-msg">${message}${metaBits ? ` <small>${metaBits}</small>` : ''}${action}</span>
     </div>`;
-  }).join('');
+  }).join(''));
   if (autoScroll) host.scrollTop = host.scrollHeight;
 }
 

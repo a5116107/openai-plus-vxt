@@ -1,5 +1,6 @@
 import './style.css';
 
+import { setElementHtml } from '../../src/app/dom';
 import type {
   ProbeArchiveEntity,
   ProbeArchivePage,
@@ -12,7 +13,7 @@ let page = 1;
 let latest: ProbeArchivePage | undefined;
 
 if (app) {
-  app.innerHTML = `
+  setElementHtml(app, `
     <header class="topbar">
       <div>
         <p class="eyebrow">OPENAI PLUS VXT</p>
@@ -55,7 +56,7 @@ if (app) {
         <span id="page-summary">0 条</span>
         <div><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button></div>
       </footer>
-    </section>`;
+    </section>`);
   bindEvents();
   void loadPage();
 }
