@@ -104,7 +104,7 @@
 
 - [x] `pnpm test:e2e-saved-payment:check` 已确认扩展构建、Playwright 和浏览器存在，并写入 `.context-snapshots/saved-payment-live-e2e/preflight.latest.json`。
 - [x] `pnpm test:e2e-saved-payment:profile` 已实现只读 session/服务端列表探测；证据不返回 accountId、access token、Cookie 或支付方式 ID。
-- [x] 本机 `Profile 4/5` 独立副本探测：headless 返回 HTTP 403，headed 通过浏览器挑战后 session HTTP 200 但账号/access token 为空；未触发 SetupIntent 写操作。
+- [x] 本机 3 个含 ChatGPT/OpenAI Cookie 的 Chrome 候选独立副本探测：直连与 `10808` SG 出口的 headless 均返回 Session HTTP 403；headed 均通过浏览器挑战后 Session HTTP 200，但 `accountPresent=false`、`accessTokenPresent=false`、支付方式数量 0；未触发 SetupIntent 写操作。
 - [x] 原始 console 样本 key 模式审计：2 个唯一候选均为 `pk_live`，`pk_test` 为 0；证据只记录指纹，不记录完整 key。
 - [x] E2E 支持 `SPM_E2E_BACKEND_BASE_URL` 测试商户代理，仅转发两个支付 API 的方法、查询与 JSON body；ChatGPT Cookie/Authorization 不转发，可选鉴权使用独立 `SPM_E2E_BACKEND_TOKEN`。
 - [x] 内嵌测试后端支持 `sk_test` 创建 Customer/SetupIntent、列出 attached Card 并设置 default；`pnpm test:saved-payment-backend` 完成 3/3，覆盖预检证据不含支付输入、直连 profile probe 模式、mock Stripe 闭环、metadata 不发送原始 accountId，以及缺失进程内临时 bearer 返回 401。

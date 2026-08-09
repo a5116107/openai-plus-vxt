@@ -13,6 +13,17 @@
 - 2026-08-09 外部交付复测：GitHub API 返回上游 `pull=true`、`push=false`，上游 push dry-run 返回 HTTP 403；Chrome/Firefox 商店发布凭据环境变量均未注入。分支已保持同步 fork，上游与商店交付继续保留为外部输入任务。
 - 2026-08-09 EF-26 扩展检索：三个工作树及对应全局技能缓存共扫描 2,842 个 JSON，57 个相关 JSON 全部可解析，最大逐次数组 12 条；29 个 CSV/JSONL/NDJSON 无观测导出。Git 全引用、提交路径和 44 个不可达对象也未找到 729 条原始记录，历史结论继续保持“外部汇总待复算”。
 
+## Live Readiness 矩阵（2026-08-09）
+
+| 门 | 当前证据 | 判定 |
+| --- | --- | --- |
+| 目标域可达性 | 直连与 `socks5h://127.0.0.1:10808` 的 Cloudflare/ChatGPT trace 均 HTTP 200、SG/SIN | 通过 |
+| 出口互异性 | 直连与 `10808` 匿名出口等同性校验一致；`7890` 未监听；`18090` SOCKS 超时、HTTP 连接失败 | 阻塞多出口 |
+| 浏览器身份 | 3 个本机 Chrome Cookie 候选：headless 直连/SG 均 HTTP 403；headed 直连/SG 均 HTTP 200，但账号与 access token 均不存在 | 阻塞资格 |
+| 资格执行器 | `live-eligibility-mullvad.py` 因未找到有效 session 进入 fail-closed | 未运行资格单元 |
+| Saved Payment preflight | 扩展、Playwright、浏览器通过；profile、支付输入、后端均缺失 | 阻塞支付写入 |
+| 多支付方式提链 | 本地方法候选、严格资格保持、终链白名单与不重放门已通过 149/149 回归；live 同轮提链无身份/支付输入 | 本地完成、live 待输入 |
+
 ## 领域状态
 
 | 领域 | 实现状态 | 当前验证边界 |
