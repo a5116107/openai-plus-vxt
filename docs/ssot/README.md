@@ -6,9 +6,9 @@
 
 - 版本：`0.0.37`。
 - 本地实现：试用资格分类、严格晋级、十类支付方式候选与终链、保存支付方式、Plus 双 Checkout、Auth/Checkout/Billing 多阶段出口、恢复不重放、IndexedDB 归档、独立运营页面、隔离上下文调度和脱敏证据均已落地。
-- 本地验证：TypeScript、145 项全量测试、6 项 SSOT 一致性测试、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、Firefox lint 0/0/0、归档运营页 12/12、资格看板全部断言、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
+- 本地验证：TypeScript、146 项全量测试、6 项 SSOT 一致性测试、1 项可执行结构基线、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、Firefox lint 0/0/0、归档运营页 12/12、资格看板全部断言、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
 - 发布：fork 预发布 `v0.0.37-ssot.2`（`b29982b`）已包含本轮 Chrome ZIP、Firefox ZIP、sources ZIP、发布清单和回滚说明；`v0.0.37-ssot.1` 保留为上一基线。
-- 质量策略：功能、安全、工作流和证据门为 PASS；QR-11 已统一 DOM 挂载并将 Firefox lint 清零，QR-12 已分层自动化终态与 live 身份门，QR-13 已建立 SSOT 自动一致性门，QR-14 已将失败终态 harness 从生产 E2E 入口迁至测试 support，QR-15 已分离历史 live 证据与当前外部门状态，QR-16 已建立显式全仓结构基线并消除 `runner-format` 复杂度告警；当前变更严格 change/shape gate 为 PASS。
+- 质量策略：功能、安全、工作流和证据门为 PASS；QR-11 已统一 DOM 挂载并将 Firefox lint 清零，QR-12 已分层自动化终态与 live 身份门，QR-13 已建立 SSOT 自动一致性门，QR-14 已将失败终态 harness 从生产 E2E 入口迁至测试 support，QR-15 已分离历史 live 证据与当前外部门状态，QR-16 已建立显式全仓结构基线并消除 `runner-format` 复杂度告警，QR-17 已将该基线转成自动阻断回退的运行门；当前变更严格 change/shape gate 为 PASS。
 
 ## 领域状态
 
@@ -21,7 +21,7 @@
 | `multi-factor-experiments` | 完成实现 | MF-18 等待真实多国家出口恢复后运行平衡矩阵 |
 | `operations-console` | 完成实现 | OC-10 IndexedDB/运营页和 OC-11 隔离调度契约已完成；OC-09 等待在线同轮命中 |
 | `payment-runner` | 完成 | 强制筛查不晋级、未知副作用不重放、终链白名单已验证 |
-| `quality-remediation` | 完成（本地范围） | AppSec 10/10、skills、stack-run、verify-evidence、QR-10..QR-16 focused regression 与总复核通过；Firefox lint 为 0 error / 0 notice / 0 warning |
+| `quality-remediation` | 完成（本地范围） | AppSec 10/10、skills、stack-run、verify-evidence、QR-10..QR-17 focused regression 与总复核通过；Firefox lint 为 0 error / 0 notice / 0 warning |
 | `runtime-log` | 完成 | 运行日志、失败分级、广播、导出和 UI 已验证 |
 | `saved-payment-methods` | 完成 | test merchant 的 SetupIntent、attached/reusable/default 和回滚已验证 |
 | `smart-automation` | 完成 | controlled production-like Plus Closure 完整；公网同轮资格命中仍是外部验证 |
@@ -45,7 +45,7 @@
 
 ## 当前结构基线
 
-2026-08-09 使用显式文件清单严格扫描 `src/`、`entrypoints/`、`scripts/` 与 `tests/support/`：168 个文件、91 个 finding（84 advisory、7 baseline）、0 blocker。`src/features/automation/runner-format.ts` 已从 65 个决策点拆分至严格门 0 finding。旧版“184 文件迁移”是当时的分支差异规模，不再作为当前任务数量或结构验收口径；其余 finding 是已登记的仓库 advisory，不等同于未完成任务 ID。
+2026-08-09 使用显式文件清单严格扫描 `src/`、`entrypoints/`、`scripts/` 与 `tests/support/`：168 个文件、91 个 finding（84 advisory、7 baseline）、0 blocker。`pnpm test:structural-baseline` 从 `git ls-files` 复算相同范围，阻止文件覆盖漂移、finding 增长、blocker 出现或 `runner-format` 回退。旧版“184 文件迁移”是当时的分支差异规模，不再作为当前任务数量或结构验收口径；其余 finding 是已登记的仓库 advisory，不等同于未完成任务 ID。
 
 ## 可选外部扩展验证
 

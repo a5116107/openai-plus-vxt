@@ -18,3 +18,4 @@
 | QR-14 | E2E 失败 harness 职责拆分 | 完成（本地范围） | 确定性失败编排迁至 `tests/support`；生产入口只保留运行逻辑和终态识别，命令契约不变 |
 | QR-15 | 外部门证据时效收口 | 完成（本地范围） | 历史 live profile 证据显式标注日期；当前 preflight、profile probe 与上游 PR 403 结果独立记录并由 SSOT 测试锁定 |
 | QR-16 | 显式全仓结构基线与低风险复杂度收敛 | 完成（本地范围） | 168 文件严格扫描为 91 finding / 0 blocker；`runner-format.ts` 聚焦扫描 0 finding，3 项兼容回归通过；旧 184 文件差异不再作为任务代理 |
+| QR-17 | 将全仓结构基线转成自动回退门 | 完成（本地范围） | `pnpm test:structural-baseline` 从 Git 文件范围复算 168/91/84/7/0 上限并阻止 `runner-format` 告警回归 |

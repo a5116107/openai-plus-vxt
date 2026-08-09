@@ -70,3 +70,9 @@
 - 严格结构扫描通过 `git ls-files` 显式覆盖 `src/`、`entrypoints/`、`scripts/` 与 `tests/support/` 的 168 个源码文件，结果为 91 个 finding（84 advisory、7 baseline）、0 blocker。
 - `summarizeActionData` 按页面、支付控件、输入发现、输入写入、输入状态和按钮提示拆分，最大复杂度从 65 降至严格门阈值以内，`runner-format.ts` 聚焦扫描为 0 finding。
 - 3 项聚焦回归锁定全部字段顺序、中文文案、falsy 字段和非对象输入语义；旧版 184 文件分支差异不再写作当前可执行任务数量。
+
+## 2026-08-09 QR-17 可执行结构回退门
+
+- `pnpm test:structural-baseline` 从 Git 跟踪文件实时生成严格扫描范围，不依赖手写文件列表或聊天中的历史数字。
+- 运行门要求覆盖文件保持 168、总 finding 不超过 91、advisory 不超过 84、baseline 不超过 7、blocker 为 0，且 `runner-format.ts` 不重新出现告警。
+- 结构债务下降会直接通过；覆盖变化或 finding 增长必须先解释并显式更新 SSOT，避免无声漂移。
