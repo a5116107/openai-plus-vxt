@@ -33,6 +33,8 @@
     "test:structural-baseline": "tsx --test tests/structural-baseline.test.ts",
     "test:e2e-plus-closure:live": "tsx scripts/e2e-plus-checkout-closure-live.ts",
     "test:e2e-plus-closure:seal": "tsx scripts/e2e-plus-checkout-closure-live.ts --seal-existing",
+    "test:live-readiness": "node --test tests/live-readiness-audit.test.mjs",
+    "audit:live": "node scripts/live-readiness-audit.mjs",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {

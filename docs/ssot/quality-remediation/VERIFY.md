@@ -4,6 +4,8 @@
 | --- | --- | --- |
 | TypeScript | `pnpm compile` | PASS，0 error |
 | 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，146/146 |
+| Live readiness 单元 | `pnpm test:live-readiness` | PASS，4/4 |
+| Live readiness 当前审计 | `pnpm audit:live` | PASS（审计完成）；`targetReachable=true`、`uniqueEgressCount=1`、`identityReady=false`、`paymentReady=false`、`fullLiveReady=false`，证据脱敏 |
 | Saved Payment 后端 | `pnpm test:saved-payment-backend` | PASS，3/3 |
 | 因素分析 | `node tools/_eligibility_analysis_smoke.mjs` | PASS |
 | 平衡排程 | `node tools/_eligibility_experiment_smoke.mjs` | PASS |

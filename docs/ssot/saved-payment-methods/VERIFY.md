@@ -113,6 +113,7 @@
 - [x] 用户 mailbox URL 的真实注册链已完成，成功证据位于 `.context-snapshots/e2e-user-mailbox-retry/chrome-e2e-result.json`；邮箱、URL token、OTP、Cookie 和 access token 均未进入证据。
 - [x] 2026-08-05 历史独立 profile `.context-snapshots/profiles/saved-payment-live` 直连 headed 探测返回 session HTTP 200、账号/access token 存在、服务端列表 HTTP 200、支付方式数量 0、default=false；该结果仅代表当次运行，不代表当前环境仍持有会话。
 - [x] 2026-08-09 当前环境 preflight 复跑：扩展构建、Playwright 与浏览器均就绪，但 `profileConfigured=false`、`testBackendMode=missing`、`inputsConfigured=false`；七组必需输入均缺失，三个工作树默认 live session 目录均为 0 个文件/0 个有效会话。历史 profile probe 仍为 `accountPresent=false`、`accessTokenPresent=false`、支付方式数量 0，未进入 SetupIntent 写操作。
+- [x] `pnpm audit:live` 已把 Saved Payment preflight 纳入统一 live 门；当前 `paymentReady=false`，缺失变量只记录变量名，不记录支付输入值。
 - [x] 2026-08-09 对历史隔离 profile 创建临时副本后复测：直连与经当前 SG 出口的 session HTTP 均为 403，`accountPresent=false`、`accessTokenPresent=false`、服务端列表未调用；临时副本已清理，源 profile 保持只读，未进入任何支付写操作。
 - [x] 2026-08-05 profile probe 新增 `SPM_E2E_SKIP_AUTH_PROXY=true` 直连模式，默认代理路径保持不变；3/3 后端/入口测试通过。
 - [x] 2026-08-05 Profile 10 复核已判定不适合作为 E2E 根目录：它是正在使用的 Chrome 子 profile，不是独立 `Local State + Default/` user-data 副本；后续已由上述独立 profile 替代。

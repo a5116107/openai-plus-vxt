@@ -20,6 +20,8 @@
 
 2026-08-09 当前环境复测：直连与本地 `10808` 经 sing-box 的 Cloudflare 与 ChatGPT trace 均为 HTTP 200、SG/SIN，匿名出口等同性校验一致；`7890` 未监听，`18090` 的 SOCKS/HTTP 目标域探测均失败。3 个本机 Chrome Cookie 候选在 headless 直连/SG 下均为 Session HTTP 403，在 headed 直连/SG 下均为 HTTP 200 但账号和 access token 均不存在，支付方式数量均为 0，因此未进入严格 1x1 账号实验。该结果只更新当前可达性和身份门边界，不覆盖历史 HK/JP/US/IN 短期节点证据，也不满足多国家或有效登录态验收。
 
+统一 live readiness 审计使用 `pnpm audit:live`，只输出脱敏门状态；当前 `targetReachable=true`、`uniqueEgressCount=1`、`identityReady=false`、`paymentReady=false`，因此严格模式不启动资格单元。
+
 此前两轮同批账号的 HK 严格复核共 24 次，其中明确结果 21、命中 0、请求错误 3；按明确结果计为 0/21，Wilson 95%CI 0%–15.5%。这些重复样本只说明该账号批次在对应时段与路线下未观察到资格，不能单独判定 HK 永久低概率，也不能区分账号与时段效应。
 
 ## 2. 研究问题与可证伪假设
