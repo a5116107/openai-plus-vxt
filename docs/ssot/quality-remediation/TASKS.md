@@ -13,3 +13,4 @@
 | QR-09 | workflow/AppSec 收口 | 完成 | workflow stack 与 AppSec 基线纳入版本控制，CommonJS guardrail 边界修复，总质量复核 blocker=0 |
 | QR-10 | 跨迁移结构预算治理 | 完成（本地范围） | OAuth 日志、probe hit/report、国家出口解析已拆为职责模块；接码超时取消/本地记账失败显式进入日志和结果；剩余 184 文件迁移预算继续 advisory |
 | QR-11 | Firefox lint 与 DOM 挂载契约 | 完成（本地范围） | 统一 `DOMParser + replaceChildren` 挂载 helper，入口与支付/面板不再直接赋值 `innerHTML`；Firefox minimum version 提升至 142；lint 0/0/0 |
+| QR-12 | 全流程 E2E 终态与身份门分层 | 完成（本地范围） | 自动化失败终态不再伪等待 120 秒；Saved Payment UI 将预期 401/403 身份门与布局错误分离；基线截图只在显式开关下更新 |

@@ -87,7 +87,7 @@
 - [x] 七组聚焦、后端与回归测试合计 72/72。
 - [x] `pnpm build`：Chrome MV3 production build 完成，总大小约 1.45 MB；manifest 含 `saved-payment-elements.js`、`world: MAIN`、`document_start`。
 - [x] `pnpm build:firefox`：Firefox MV2 production build 完成，总大小约 1.45 MB；SPM-16 已完成 Chrome 真实 Stripe Element 交互，Firefox 由同源实现、构建和回归覆盖。
-- [x] `node scripts/e2e-saved-payment-ui.mjs`：420px/360px 两个视口各识别 7 个控件，均无横向溢出、控件越界、顶栏标签裁切或控制台错误；`clippedTabs` 均为空数组。
+- [x] `node scripts/e2e-saved-payment-ui.mjs`：420px/360px 两个视口各识别 7 个控件，均无横向溢出、控件越界或顶栏标签裁切；预期 Session 401/403 单列为 `identityGate`，其他控制台错误仍阻断；默认截图写入 `.context-snapshots`，只在显式基线更新开关下改写 `image/`。
 - [x] UI 截图：`image/saved-payment-panel-desktop.png`、`image/saved-payment-panel-narrow.png`。
 - [x] `pnpm package:saved-payment`：生成 `dist/openai-plus-vxt-0.0.37-chrome.zip` 与 `dist/openai-plus-vxt-0.0.37-firefox.xpi`，manifest/MAIN-world bridge/版本检查全部通过。
 - [x] `dist/saved-payment-release-0.0.37.json`：生产源码、浏览器 E2E/内嵌测试后端脚本及 Chrome/Firefox 构建目录的 secret key、完整 PK、SetupIntent secret、Luhn 卡号形态扫描 findings 为空，并记录双包 SHA-256。

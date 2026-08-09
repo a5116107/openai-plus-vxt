@@ -39,4 +39,10 @@
 
 - 新增 `src/app/dom.ts`，所有入口和支付/面板的 HTML 挂载统一走 `DOMParser + replaceChildren`；源码不再直接赋值动态 `innerHTML`。
 - Firefox manifest `strict_min_version` 提升至 `142.0`，与 `data_collection_permissions.required=['none']` 的 Firefox/Android 支持契约一致。
-- `pnpm compile`、135/135 全量测试、3/3 Saved Payment 后端、Chrome/Firefox 构建、`web-ext lint`（0 errors / 0 notices / 0 warnings）、运营控制台、资格看板、三阶段出口和 Plus Closure fixture 均通过。
+- `pnpm compile`、136/136 全量测试、3/3 Saved Payment 后端、Chrome/Firefox 构建、`web-ext lint`（0 errors / 0 notices / 0 warnings）、运营控制台、资格看板、三阶段出口和 Plus Closure fixture 均通过。
+
+## 2026-08-09 QR-12 实测链收口
+
+- 主流程 E2E 的启动里程碑同时观察自动化终态；出口或上游在早期失败时立即输出具体步骤、消息和进度轨迹，不再转化为额外 120 秒 harness 超时。
+- `pnpm test:e2e-terminal-boundary` 使用失效 Auth 出口重复验证该边界，约 6 秒返回预期失败终态，六项 harness 断言全部通过。
+- Saved Payment UI 将布局断言、身份门和其他控制台错误分层；默认截图写入 `.context-snapshots/saved-payment-ui/`，仓库基线只由 `OPX_SAVED_PAYMENT_UPDATE_BASELINES=1` 显式更新。

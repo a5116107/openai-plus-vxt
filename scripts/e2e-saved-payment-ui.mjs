@@ -8,6 +8,7 @@ const repoRoot = process.cwd();
 const extensionDir = path.resolve(repoRoot, '.output/chrome-mv3');
 const outputDir = path.resolve(repoRoot, '.context-snapshots/saved-payment-ui');
 const imageDir = path.resolve(repoRoot, 'image');
+const screenshotDir = process.env.OPX_SAVED_PAYMENT_UPDATE_BASELINES === '1' ? imageDir : outputDir;
 const playwrightModule = 'C:/Users/Administrator/AppData/Roaming/npm/node_modules/agent-browser/node_modules/playwright-core/index.js';
 const browserCandidates = [
   'C:/Users/Administrator/AppData/Local/ms-playwright/chromium-1228/chrome-win64/chrome.exe',
@@ -22,7 +23,7 @@ if (!executablePath || !existsSync(playwrightModule) || !existsSync(extensionDir
 const imported = await import(pathToFileURL(playwrightModule).href);
 const { chromium } = imported.default || imported;
 await mkdir(outputDir, { recursive: true });
-await mkdir(imageDir, { recursive: true });
+await mkdir(screenshotDir, { recursive: true });
 const profileDir = await mkdtemp(path.join(tmpdir(), 'opx-saved-payment-ui-'));
 let context;
 
@@ -55,16 +56,33 @@ try {
   await page.waitForTimeout(500);
 
   const desktop = await inspect(page);
-  await page.screenshot({ path: path.join(imageDir, 'saved-payment-panel-desktop.png'), fullPage: true });
+  await page.screenshot({ path: path.join(screenshotDir, 'saved-payment-panel-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 360, height: 760 });
   await page.waitForTimeout(200);
   const narrow = await inspect(page);
-  await page.screenshot({ path: path.join(imageDir, 'saved-payment-panel-narrow.png'), fullPage: true });
+  await page.screenshot({ path: path.join(screenshotDir, 'saved-payment-panel-narrow.png'), fullPage: true });
 
-  const result = { extensionId, desktop, narrow, errors };
+  const identityGate = classifyIdentityGate(desktop.status, narrow.status);
+  const expectedErrors = identityGate.blocked
+    ? errors.filter((error) => isExpectedIdentityGateError(error, identityGate.httpStatus))
+    : [];
+  const unexpectedErrors = errors.filter((error) => !expectedErrors.includes(error));
+  const result = {
+    extensionId,
+    desktop,
+    narrow,
+    identityGate,
+    errors,
+    expectedErrors,
+    unexpectedErrors,
+    screenshots: [
+      path.relative(repoRoot, path.join(screenshotDir, 'saved-payment-panel-desktop.png')).replaceAll('\\', '/'),
+      path.relative(repoRoot, path.join(screenshotDir, 'saved-payment-panel-narrow.png')).replaceAll('\\', '/'),
+    ],
+  };
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   if (
-    errors.length
+    unexpectedErrors.length
     || desktop.overflow
     || narrow.overflow
     || desktop.outOfBounds
@@ -77,6 +95,20 @@ try {
 } finally {
   await context?.close().catch(() => undefined);
   await rm(profileDir, { recursive: true, force: true }).catch(() => undefined);
+}
+
+function classifyIdentityGate(...messages) {
+  const text = messages.join(' ');
+  const match = /ChatGPT session HTTP\s+(401|403)/i.exec(text);
+  return {
+    blocked: Boolean(match),
+    httpStatus: match ? Number(match[1]) : 0,
+  };
+}
+
+function isExpectedIdentityGateError(message, httpStatus) {
+  if (![401, 403].includes(httpStatus)) return false;
+  return new RegExp(`Failed to load resource: the server responded with a status of ${httpStatus}\\b`, 'i').test(message);
 }
 
 async function inspect(page) {

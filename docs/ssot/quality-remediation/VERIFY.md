@@ -3,7 +3,7 @@
 | 验证项 | 命令 | 当前结果 |
 | --- | --- | --- |
 | TypeScript | `pnpm compile` | PASS，0 error |
-| 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，135/135 |
+| 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，136/136 |
 | Saved Payment 后端 | `pnpm test:saved-payment-backend` | PASS，3/3 |
 | 因素分析 | `node tools/_eligibility_analysis_smoke.mjs` | PASS |
 | 平衡排程 | `node tools/_eligibility_experiment_smoke.mjs` | PASS |
@@ -24,6 +24,9 @@
 | Firefox lint（QR-11） | `pnpm dlx web-ext lint --source-dir .output/firefox-mv2` | PASS，0 errors / 0 notices / 0 warnings；动态模板统一经 `DOMParser + replaceChildren` 挂载，manifest `strict_min_version=142.0` 满足 `data_collection_permissions` 契约 |
 | QR-10 focused regression | `pnpm tsx --test tests/qr10-structure.test.ts` | PASS，3/3；脱敏日志、国家出口解析、支付方式报告模块均通过 |
 | QR-10/QR-11 shape delta | `git diff --stat` + `pnpm compile` + `pnpm tsx --test tests/qr10-structure.test.ts` | PASS；既有高风险入口拆分保留；新增 `src/app/dom.ts` 统一挂载职责，55 个赋值点迁移且无循环依赖 |
+| QR-12 主流程终态 | `pnpm test:e2e-terminal-boundary` | PASS；失效 Auth 出口在 `cleanup-environment` 形成结构化失败终态，约 8 秒返回，`fullAutomationReachedTerminal=true`，不再额外等待里程碑超时 |
+| QR-12 Saved Payment UI | `node scripts/e2e-saved-payment-ui.mjs` | PASS；420px/360px 无溢出、越界和标签裁切；真实 Session 401/403 单列为 `identityGate`，非身份错误仍阻断 |
+| QR-12 源码契约 | `pnpm tsx --test tests/qr10-structure.test.ts` | PASS，5/5；终态短路、本轮证据、身份状态精确匹配和截图基线路径均有邻近回归断言 |
 | 接码超时清理可观测性 | `pnpm compile` + `tests/qr10-structure.test.ts` | PASS；平台取消、本地订单记账和清理失败均保留可观测结果 |
 | 0.0.37 预发布 | `gh release view v0.0.37-ssot.1 --repo a5116107/openai-plus-vxt` | PASS，4 个资产已上传 |
 

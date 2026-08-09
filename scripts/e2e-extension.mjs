@@ -1,10 +1,14 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const repoRoot = process.cwd();
+if (process.argv.includes('--assert-terminal-boundary')) {
+  process.exit(runTerminalBoundaryHarness());
+}
 const extensionDir = path.resolve(repoRoot, process.env.OPX_EXTENSION_DIR || '.output/chrome-mv3');
 const evidenceDir = path.resolve(repoRoot, process.env.OPX_E2E_OUTPUT || '.context-snapshots/e2e-extension');
 const playwrightModule = process.env.OPX_PLAYWRIGHT_MODULE ||
@@ -168,18 +172,17 @@ try {
 
   let autoState = await waitForStoredState(
     worker,
-    (state) => Boolean(
-      state?.automation?.emails?.length &&
-      state?.automation?.run?.selectedEmailId &&
-      state?.automation?.steps?.some((step) => step.id === 'cleanup-environment' && step.status === 'success')
-    ),
+    (state) => hasAutomationStartMilestone(state) || isAutomationTerminalState(state),
     120_000,
   );
-  autoState = await waitForStoredState(
-    worker,
-    (state) => state?.automation?.steps?.some((step) => step.id === 'open-register' && ['success', 'error'].includes(step.status)),
-    45_000,
-  ).catch(() => autoState);
+  if (!isAutomationTerminalState(autoState)) {
+    autoState = await waitForStoredState(
+      worker,
+      (state) => isAutomationTerminalState(state)
+        || state?.automation?.steps?.some((step) => step.id === 'open-register' && ['success', 'error'].includes(step.status)),
+      45_000,
+    ).catch(() => autoState);
+  }
   result.runtime.autoSyncEmailCount = autoState?.automation?.emails?.length || 0;
   result.runtime.emailSelectionMode = autoState?.automation?.settings?.emailSelectionMode || '';
   result.runtime.selectedEmailId = autoState?.automation?.run?.selectedEmailId || '';
@@ -500,6 +503,22 @@ function summarizeAutomationState(state) {
   };
 }
 
+function hasAutomationStartMilestone(state) {
+  return Boolean(
+    state?.automation?.emails?.length
+    && state?.automation?.run?.selectedEmailId
+    && state?.automation?.steps?.some((step) => step.id === 'cleanup-environment' && step.status === 'success')
+  );
+}
+
+function isAutomationTerminalState(state) {
+  const automation = state?.automation;
+  if (!automation?.run || automation.run.running !== false) return false;
+  if (automation.steps?.some((step) => step.status === 'error')) return true;
+  if (automation.logs?.some((entry) => entry.level === 'error')) return true;
+  return automation.logs?.some((entry) => entry.level === 'success' && /^自动执行完成/.test(entry.message)) || false;
+}
+
 async function waitForAutomationTerminal(runtime, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   const progressTrace = [];
@@ -598,4 +617,47 @@ function sanitizeEvidence(value) {
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, 'EMAIL_REDACTED')
     .replace(/(验证码|OTP|code)[^\n]{0,48}?\b\d{4,8}\b/gi, '$1 CODE_REDACTED')
     .replace(/\b(?:eyJ[a-zA-Z0-9_-]{10,}|sk-[a-zA-Z0-9_-]{10,}|sess_[a-zA-Z0-9_-]{10,})\b/g, 'TOKEN_REDACTED');
+}
+
+function runTerminalBoundaryHarness() {
+  const evidencePath = path.join(repoRoot, '.context-snapshots/e2e-extension/chrome-e2e-result.json');
+  rmSync(evidencePath, { force: true });
+  const startedAtMs = Date.now();
+  const child = spawnSync(process.execPath, [path.join(repoRoot, 'scripts/e2e-extension.mjs')], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      OPX_E2E_SKIP_ACICA_SYNC: '1',
+      OPX_E2E_EMAIL: 'fixture@example.test',
+      OPX_E2E_MAILBOX_URL: 'http://127.0.0.1:9/messages/fixture@example.test',
+      OPX_E2E_FORCE_MISSING_CLEANUP_TARGET: '1',
+      OPX_E2E_AUTH_PORT: '9',
+      OPX_E2E_CHECKOUT_PORT: '9',
+      OPX_E2E_BILLING_PORT: '9',
+      OPX_FULL_FLOW_TIMEOUT_MS: '30000',
+    },
+  });
+
+  const terminalResult = JSON.parse(readFileSync(evidencePath, 'utf8'));
+  const elapsedMs = Date.now() - startedAtMs;
+  const checks = {
+    childReportedExpectedFailure: child.status === 1,
+    noHarnessFatalError: !terminalResult.fatalError,
+    failedTerminalObserved: terminalResult.runtime?.fullFlowOutcome === 'failed',
+    terminalCheckRecorded: terminalResult.checks?.fullAutomationReachedTerminal === true,
+    failedAtCleanup: terminalResult.runtime?.finalCurrentStepId === 'cleanup-environment',
+    returnedWithinBoundary: elapsedMs < 60_000,
+  };
+  const output = {
+    ok: Object.values(checks).every(Boolean),
+    elapsedMs,
+    checks,
+    outcome: terminalResult.runtime?.fullFlowOutcome || '',
+    message: terminalResult.runtime?.fullFlowMessage || '',
+    childStderr: child.stderr.trim(),
+  };
+
+  process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+  return output.ok ? 0 : 1;
 }
