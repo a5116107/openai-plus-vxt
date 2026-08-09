@@ -63,7 +63,8 @@
 
 - Saved Payment 历史 profile 成功证据标注为 2026-08-05 当次运行，不再表述为当前可用会话。
 - 2026-08-09 preflight 与 profile probe 独立记录当前环境缺少 profile、支付输入和测试后端，且未触发支付写操作。
-- 上游 PR 创建同时验证 GraphQL 与 REST 路径，两者均因当前 Token 权限返回 403；该权限门继续保持未完成。
+- 2026-08-09 进一步用历史隔离 profile 的临时副本完成直连和单一 SG 出口复测，两次 Session 均为 HTTP 403，账号/access token 不存在；副本已清理且没有支付写操作。
+- 上游 PR 创建历史上同时验证 GraphQL 与 REST 路径均为 403；本轮再次通过 `gh pr create` 验证 GraphQL 仍为 `Resource not accessible by personal access token`，该权限门继续保持未完成。
 
 ## 2026-08-09 QR-16 显式结构基线
 

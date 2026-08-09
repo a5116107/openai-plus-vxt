@@ -29,7 +29,7 @@
 | QR-12 源码契约 | `pnpm tsx --test tests/qr10-structure.test.ts` | PASS，5/5；终态短路、本轮证据、身份状态精确匹配和截图基线路径均有邻近回归断言 |
 | QR-13/QR-15/QR-16/QR-17 SSOT 一致性 | `pnpm test:ssot` | PASS，6/6；领域三件套、非完成任务根汇总、未勾选外部门、live 输入完整性、当前证据时效、结构基线与可执行命令均通过 |
 | QR-14 harness 拆分 | `pnpm test:e2e-terminal-boundary` + `pnpm tsx --test tests/qr10-structure.test.ts` | PASS；失败编排位于 `tests/support`，生产 E2E 入口不再包含子进程 harness，六项终态边界断言保持通过 |
-| QR-15 外部门实测 | `pnpm test:e2e-saved-payment:check` + `pnpm test:e2e-saved-payment:profile` + GitHub GraphQL/REST PR 创建 | PASS（边界判定）；当前 profile/支付输入/测试后端缺失，profile probe 无账号或 AT，PR 两条路径均为 403，未形成 live 支付或上游交付结论 |
+| QR-15 外部门实测 | `pnpm test:e2e-saved-payment:check` + 临时隔离 profile 直连/SG 复测 + GitHub GraphQL/REST PR 创建 | PASS（边界判定）；默认 profile/支付输入/测试后端缺失，历史 profile 副本两条路径的 Session 均为 403 且无账号/AT，当前 `gh pr create` 再次为 GraphQL 403，未形成 live 支付或上游交付结论 |
 | QR-16 formatter 回归 | `pnpm tsx --test tests/runner-format.test.ts` | PASS，3/3；全部字段顺序和文案、falsy 字段、非对象输入保持兼容 |
 | QR-16 聚焦结构门 | `structural-quality --files src/features/automation/runner-format.ts,tests/runner-format.test.ts --strict` | PASS，0 finding / 0 blocker；原 65 决策点函数已拆分 |
 | QR-16 全仓结构基线 | 显式 `git ls-files` 清单 + `structural-quality --strict` | PASS（基线判定），168 文件、91 finding（84 advisory、7 baseline）、0 blocker；`runner-format.ts` 告警为 0 |

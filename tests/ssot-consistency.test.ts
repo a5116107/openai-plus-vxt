@@ -10,6 +10,8 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json
 };
 const rootIndex = fs.readFileSync(path.join(ssotRoot, 'README.md'), 'utf8');
 const savedPaymentVerify = fs.readFileSync(path.join(ssotRoot, 'saved-payment-methods/VERIFY.md'), 'utf8');
+const eligibilityFactorsVerify = fs.readFileSync(path.join(ssotRoot, 'eligibility-factors/VERIFY.md'), 'utf8');
+const multiFactorReadme = fs.readFileSync(path.join(ssotRoot, 'multi-factor-experiments/README.md'), 'utf8');
 const qualityRemediationReadme = fs.readFileSync(path.join(ssotRoot, 'quality-remediation/README.md'), 'utf8');
 const qualityRemediationTasks = fs.readFileSync(path.join(ssotRoot, 'quality-remediation/TASKS.md'), 'utf8');
 const qualityRemediationVerify = fs.readFileSync(path.join(ssotRoot, 'quality-remediation/VERIFY.md'), 'utf8');
@@ -97,6 +99,9 @@ test('QR-15 current external-gate evidence is dated and fail-closed', () => {
   assert.match(savedPaymentVerify, /2026-08-09 当前环境 preflight/);
   assert.match(savedPaymentVerify, /profileConfigured=false/);
   assert.match(savedPaymentVerify, /testBackendMode=missing/);
+  assert.match(savedPaymentVerify, /历史隔离 profile.*直连与经当前 SG 出口.*session HTTP 均为 403/);
+  assert.match(eligibilityFactorsVerify, /2026-08-09.*10808.*Cloudflare 与 ChatGPT trace 均为 HTTP 200.*SG/);
+  assert.match(multiFactorReadme, /2026-08-09.*10808.*单一 SG 出口/);
   assert.match(savedPaymentVerify, /GraphQL.*REST.*403/);
   assert.doesNotMatch(savedPaymentVerify, /当前独立 profile/);
 });

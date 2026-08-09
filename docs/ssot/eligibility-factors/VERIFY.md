@@ -130,6 +130,7 @@
 - `.context-snapshots/live-eligibility-0.0.33/result-hk-http-29090-minimal.json`：参数化 HTTP 前置成功访问目标域并完成 1×1 流程；修复前扩展代理仍为 `proxy-disabled`，样本为错误且未归因。
 - `.context-snapshots/live-eligibility-0.0.33/result-proxy-sync-failure-smoke.json`：修复后 `proxySetup.saved=true`，Checkout 证据源为 `country-map`，实际 IP/国家和子网均入观测；目标域请求失败时仍为 `network-proxy + invalid`，可归因 0。
 - 严格模式新增提前门：目标域预检失败、显式期望国家错位或扩展健康检查实际国家不匹配时，在账号实验前停止。
+- 2026-08-09 当前只读复测：`10808` 经 sing-box 访问 Cloudflare 与 ChatGPT trace 均为 HTTP 200，实际国家均为 SG；`7890` 未监听。隔离 profile 副本直连和经 SG 出口的 Session 均为 HTTP 403，`accountPresent=false`、`accessTokenPresent=false`，所以没有运行严格 1x1 资格单元，也没有产生 hit/miss 或支付证据。
 
 实现复核：请求错误和处理未生效样本保留在原始日志、错误率与漂移输入中，但不进入资格率、因素分组、匹配效应、覆盖矩阵、cooldown 或证据门。候选 Checkout 已创建但严格资格门未通过时，记录保留候选链接状态，同时 `qualificationVerified=false`、`linkUsable=false`。
 
