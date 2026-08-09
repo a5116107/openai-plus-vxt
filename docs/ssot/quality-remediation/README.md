@@ -46,3 +46,15 @@
 - 主流程 E2E 的启动里程碑同时观察自动化终态；出口或上游在早期失败时立即输出具体步骤、消息和进度轨迹，不再转化为额外 120 秒 harness 超时。
 - `pnpm test:e2e-terminal-boundary` 使用失效 Auth 出口重复验证该边界，约 6 秒返回预期失败终态，六项 harness 断言全部通过。
 - Saved Payment UI 将布局断言、身份门和其他控制台错误分层；默认截图写入 `.context-snapshots/saved-payment-ui/`，仓库基线只由 `OPX_SAVED_PAYMENT_UPDATE_BASELINES=1` 显式更新。
+
+## 2026-08-09 QR-13 SSOT 一致性门
+
+- `pnpm test:ssot` 自动枚举所有 `TASKS.md`，要求同目录存在 `README.md` 和 `VERIFY.md`。
+- 所有非完成任务 ID 必须出现在根索引的唯一未完成汇总中；新增或遗漏状态会直接使测试失败。
+- 未勾选验收仅允许保留已声明的外部门，Saved Payment live preflight 的全部必需变量必须在根索引显式列出。
+
+## 2026-08-09 QR-14 E2E harness 拆分
+
+- 确定性失败出口、子进程和本轮证据断言迁至 `tests/support/e2e-extension-terminal-boundary.mjs`。
+- `scripts/e2e-extension.mjs` 不再承载自调用测试模式，生产入口只保留真实浏览器流程和自动化终态识别。
+- `pnpm test:e2e-terminal-boundary` 的用户命令与六项验收保持不变，QR-12 源码契约同步锁定 support 边界。

@@ -1,0 +1,87 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import test from 'node:test';
+
+const repoRoot = path.resolve(import.meta.dirname, '..');
+const ssotRoot = path.join(repoRoot, 'docs/ssot');
+const rootIndex = fs.readFileSync(path.join(ssotRoot, 'README.md'), 'utf8');
+
+function listMarkdownFiles(directory: string): string[] {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolutePath = path.join(directory, entry.name);
+    return entry.isDirectory()
+      ? listMarkdownFiles(absolutePath)
+      : entry.name.endsWith('.md') ? [absolutePath] : [];
+  });
+}
+
+test('QR-13 every task SSOT has its contract and verification siblings', () => {
+  const taskFiles = listMarkdownFiles(ssotRoot).filter((file) => path.basename(file) === 'TASKS.md');
+  assert.ok(taskFiles.length > 0);
+  for (const taskFile of taskFiles) {
+    const directory = path.dirname(taskFile);
+    assert.ok(fs.existsSync(path.join(directory, 'README.md')), `${taskFile} is missing README.md`);
+    assert.ok(fs.existsSync(path.join(directory, 'VERIFY.md')), `${taskFile} is missing VERIFY.md`);
+  }
+});
+
+test('QR-13 root index has an exact, non-duplicated incomplete-task summary', () => {
+  const incompleteTaskIds = new Set<string>();
+  const taskFiles = listMarkdownFiles(ssotRoot).filter((file) => path.basename(file) === 'TASKS.md');
+  for (const taskFile of taskFiles) {
+    for (const line of fs.readFileSync(taskFile, 'utf8').split(/\r?\n/)) {
+      if (!line.startsWith('|')) continue;
+      const cells = line.split('|').slice(1, -1).map((cell) => cell.trim());
+      const taskId = cells[0];
+      if (!/^[A-Z][A-Z0-9]*-\d+$/.test(taskId)) continue;
+      if (cells.some((cell) => /^(部分完成|待|阻塞)/.test(cell))) incompleteTaskIds.add(taskId);
+    }
+  }
+
+  assert.ok(incompleteTaskIds.size > 0);
+  const externalInputsSection = rootIndex.match(/## 未完成任务的唯一汇总\s+([\s\S]*?)(?=\n## |$)/)?.[1];
+  assert.ok(externalInputsSection, 'root index is missing the incomplete-task summary');
+  const summarizedTaskIds = [...externalInputsSection.matchAll(/\b[A-Z][A-Z0-9]*-\d+\b/g)].map((match) => match[0]);
+  assert.equal(new Set(summarizedTaskIds).size, summarizedTaskIds.length, 'root incomplete-task summary contains duplicate task IDs');
+  assert.deepEqual(new Set(summarizedTaskIds), incompleteTaskIds, 'root incomplete-task summary differs from task SSOT state');
+  for (const taskId of incompleteTaskIds) {
+    assert.match(externalInputsSection, new RegExp(`\\b${taskId}\\b`), `${taskId} is absent from the root incomplete-task summary`);
+  }
+});
+
+test('QR-13 unchecked verification items are limited to declared external gates', () => {
+  const allowedUnchecked = new Map([
+    ['multi-factor-experiments/VERIFY.md', 'MF-18'],
+    ['saved-payment-methods/VERIFY.md', '上游交付'],
+  ]);
+  const unchecked = listMarkdownFiles(ssotRoot).flatMap((file) =>
+    fs.readFileSync(file, 'utf8').split(/\r?\n/)
+      .filter((line) => /^- \[ \]/.test(line))
+      .map((line) => ({
+        relativePath: path.relative(ssotRoot, file).replaceAll('\\', '/'),
+        line,
+      })),
+  );
+
+  assert.equal(unchecked.length, allowedUnchecked.size);
+  for (const item of unchecked) {
+    const marker = allowedUnchecked.get(item.relativePath);
+    assert.ok(marker, `undeclared unchecked verification item: ${item.relativePath}`);
+    assert.match(item.line, new RegExp(marker), `${item.relativePath} is missing external-gate marker ${marker}`);
+  }
+});
+
+test('QR-13 root index names every Saved Payment live preflight input', () => {
+  const requiredInputs = [
+    'SPM_E2E_PROFILE_DIR',
+    'SPM_E2E_PUBLISHABLE_KEY',
+    'SPM_E2E_BILLING_NAME',
+    'SPM_E2E_CARD_NUMBER',
+    'SPM_E2E_CARD_EXPIRY',
+    'SPM_E2E_CARD_CVC',
+    'SPM_E2E_BACKEND_BASE_URL',
+    'SPM_E2E_STRIPE_SECRET_KEY',
+  ];
+  for (const input of requiredInputs) assert.match(rootIndex, new RegExp(`\\b${input}\\b`));
+});

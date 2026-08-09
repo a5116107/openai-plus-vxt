@@ -96,7 +96,7 @@
 - [x] `quality-guard review-entry` 已在当前闭环请求指纹 `06ea161d70766098` 下运行：`spec.verdict`、`quality.verdict`、`verify.evidence` 均为 PASS，任务复核 5/5、0 blocking；专项 E2E 薄入口与 runner 均无 structural-quality finding。
 - [x] fork 发布已完成：`a5116107/openai-plus-vxt` 的 `main` 和集成分支已同步 0.0.37 集成结果，预发布 `v0.0.37-ssot.1` 已上传双端产物、哈希清单和回滚说明。
 - [ ] 上游交付仍受权限门阻断：向 `suyancc/openai-plus-vxt` 推送返回 403，当前令牌也无权创建上游 PR。
-- [ ] 最新严格质量总门仍受迁移规模和结构预算阻断；功能测试、双端构建、浏览器夹具与敏感信息扫描均通过，但 change/shape budget 和既有超大文件未被标记为 PASS。
+- [x] 最新严格质量总门已通过；当前变更的 change/shape budget、anti-mud、功能测试、双端构建、浏览器夹具与敏感信息扫描均为 PASS，历史超大文件和 184 文件迁移规模继续登记为仓库级结构债务。
 
 命令实际通过后再勾选并记录测试数量；文件存在不计为 PASS。
 

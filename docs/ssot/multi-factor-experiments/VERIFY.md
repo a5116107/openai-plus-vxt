@@ -50,7 +50,7 @@
 - [x] `pnpm compile` 通过。
 - [x] `pnpm test:probe-readiness`：5/5 通过。
 - [x] 真实动态前置出口账号实验形成 8 条观测：7 error、1 miss、0 hit。
-- [ ] 多国家链式出口认证恢复并形成平衡交叉样本。
+- [ ] MF-18：多国家链式出口认证恢复并形成平衡交叉样本。
 - [x] 0.0.31 Firefox 构建、Chrome 浏览器 E2E 与 XPI 复核。
 
 ### 真实证据

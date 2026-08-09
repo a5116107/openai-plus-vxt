@@ -28,7 +28,8 @@
     "test:e2e-saved-payment:profile": "node scripts/e2e-saved-payment-live.mjs --probe-profile",
     "test:e2e-plus-closure": "node scripts/e2e-plus-checkout-closure-fixture.mjs",
     "test:e2e-operations-console": "node scripts/e2e-operations-console.mjs",
-    "test:e2e-terminal-boundary": "node scripts/e2e-extension.mjs --assert-terminal-boundary",
+    "test:e2e-terminal-boundary": "node tests/support/e2e-extension-terminal-boundary.mjs",
+    "test:ssot": "tsx --test tests/ssot-consistency.test.ts",
     "test:e2e-plus-closure:live": "tsx scripts/e2e-plus-checkout-closure-live.ts",
     "test:e2e-plus-closure:seal": "tsx scripts/e2e-plus-checkout-closure-live.ts --seal-existing",
     "postinstall": "wxt prepare"

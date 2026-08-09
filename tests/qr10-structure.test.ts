@@ -55,13 +55,14 @@ test('QR-11 browser markup uses the shared DOM mount and Firefox contract is com
 test('QR-12 E2E scripts separate terminal failure, identity gate, and screenshot baselines', () => {
   const repoRoot = path.resolve(import.meta.dirname, '..');
   const extensionE2e = fs.readFileSync(path.join(repoRoot, 'scripts/e2e-extension.mjs'), 'utf8');
+  const terminalBoundaryE2e = fs.readFileSync(path.join(repoRoot, 'tests/support/e2e-extension-terminal-boundary.mjs'), 'utf8');
   const savedPaymentE2e = fs.readFileSync(path.join(repoRoot, 'scripts/e2e-saved-payment-ui.mjs'), 'utf8');
   const packageJson = fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8');
 
   assert.match(extensionE2e, /hasAutomationStartMilestone\(state\) \|\| isAutomationTerminalState\(state\)/);
   assert.match(extensionE2e, /if \(!isAutomationTerminalState\(autoState\)\)/);
-  assert.match(extensionE2e, /rmSync\(evidencePath, \{ force: true \}\)/);
-  assert.match(packageJson, /e2e-extension\.mjs --assert-terminal-boundary/);
+  assert.match(terminalBoundaryE2e, /rmSync\(evidencePath, \{ force: true \}\)/);
+  assert.match(packageJson, /tests\/support\/e2e-extension-terminal-boundary\.mjs/);
 
   assert.match(savedPaymentE2e, /OPX_SAVED_PAYMENT_UPDATE_BASELINES === '1' \? imageDir : outputDir/);
   assert.match(savedPaymentE2e, /unexpectedErrors\.length/);
