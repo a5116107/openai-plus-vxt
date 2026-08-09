@@ -58,3 +58,9 @@
 - 确定性失败出口、子进程和本轮证据断言迁至 `tests/support/e2e-extension-terminal-boundary.mjs`。
 - `scripts/e2e-extension.mjs` 不再承载自调用测试模式，生产入口只保留真实浏览器流程和自动化终态识别。
 - `pnpm test:e2e-terminal-boundary` 的用户命令与六项验收保持不变，QR-12 源码契约同步锁定 support 边界。
+
+## 2026-08-09 QR-15 外部门证据时效
+
+- Saved Payment 历史 profile 成功证据标注为 2026-08-05 当次运行，不再表述为当前可用会话。
+- 2026-08-09 preflight 与 profile probe 独立记录当前环境缺少 profile、支付输入和测试后端，且未触发支付写操作。
+- 上游 PR 创建同时验证 GraphQL 与 REST 路径，两者均因当前 Token 权限返回 403；该权限门继续保持未完成。

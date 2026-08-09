@@ -3,7 +3,7 @@
 | 验证项 | 命令 | 当前结果 |
 | --- | --- | --- |
 | TypeScript | `pnpm compile` | PASS，0 error |
-| 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，140/140 |
+| 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，141/141 |
 | Saved Payment 后端 | `pnpm test:saved-payment-backend` | PASS，3/3 |
 | 因素分析 | `node tools/_eligibility_analysis_smoke.mjs` | PASS |
 | 平衡排程 | `node tools/_eligibility_experiment_smoke.mjs` | PASS |
@@ -27,8 +27,9 @@
 | QR-12 主流程终态 | `pnpm test:e2e-terminal-boundary` | PASS；失效 Auth 出口在 `cleanup-environment` 形成结构化失败终态，约 8 秒返回，`fullAutomationReachedTerminal=true`，不再额外等待里程碑超时 |
 | QR-12 Saved Payment UI | `node scripts/e2e-saved-payment-ui.mjs` | PASS；420px/360px 无溢出、越界和标签裁切；真实 Session 401/403 单列为 `identityGate`，非身份错误仍阻断 |
 | QR-12 源码契约 | `pnpm tsx --test tests/qr10-structure.test.ts` | PASS，5/5；终态短路、本轮证据、身份状态精确匹配和截图基线路径均有邻近回归断言 |
-| QR-13 SSOT 一致性 | `pnpm test:ssot` | PASS，4/4；领域三件套、非完成任务根汇总、未勾选外部门和 live 输入完整性均通过 |
+| QR-13/QR-15 SSOT 一致性 | `pnpm test:ssot` | PASS，5/5；领域三件套、非完成任务根汇总、未勾选外部门、live 输入完整性与当前证据时效均通过 |
 | QR-14 harness 拆分 | `pnpm test:e2e-terminal-boundary` + `pnpm tsx --test tests/qr10-structure.test.ts` | PASS；失败编排位于 `tests/support`，生产 E2E 入口不再包含子进程 harness，六项终态边界断言保持通过 |
+| QR-15 外部门实测 | `pnpm test:e2e-saved-payment:check` + `pnpm test:e2e-saved-payment:profile` + GitHub GraphQL/REST PR 创建 | PASS（边界判定）；当前 profile/支付输入/测试后端缺失，profile probe 无账号或 AT，PR 两条路径均为 403，未形成 live 支付或上游交付结论 |
 | 接码超时清理可观测性 | `pnpm compile` + `tests/qr10-structure.test.ts` | PASS；平台取消、本地订单记账和清理失败均保留可观测结果 |
 | 0.0.37 预发布 | `gh release view v0.0.37-ssot.1 --repo a5116107/openai-plus-vxt` | PASS，4 个资产已上传 |
 

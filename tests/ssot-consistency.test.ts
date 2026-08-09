@@ -6,6 +6,7 @@ import test from 'node:test';
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const ssotRoot = path.join(repoRoot, 'docs/ssot');
 const rootIndex = fs.readFileSync(path.join(ssotRoot, 'README.md'), 'utf8');
+const savedPaymentVerify = fs.readFileSync(path.join(ssotRoot, 'saved-payment-methods/VERIFY.md'), 'utf8');
 
 function listMarkdownFiles(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -84,4 +85,12 @@ test('QR-13 root index names every Saved Payment live preflight input', () => {
     'SPM_E2E_STRIPE_SECRET_KEY',
   ];
   for (const input of requiredInputs) assert.match(rootIndex, new RegExp(`\\b${input}\\b`));
+});
+
+test('QR-15 current external-gate evidence is dated and fail-closed', () => {
+  assert.match(savedPaymentVerify, /2026-08-09 当前环境 preflight/);
+  assert.match(savedPaymentVerify, /profileConfigured=false/);
+  assert.match(savedPaymentVerify, /testBackendMode=missing/);
+  assert.match(savedPaymentVerify, /GraphQL.*REST.*403/);
+  assert.doesNotMatch(savedPaymentVerify, /当前独立 profile/);
 });

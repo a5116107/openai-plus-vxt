@@ -95,7 +95,7 @@
 - [x] 生产代码 secret-shaped 扫描未发现具体 PK、client secret 或卡号 fixture；桥回包测试证明不含请求中的 PK/client secret。
 - [x] `quality-guard review-entry` 已在当前闭环请求指纹 `06ea161d70766098` 下运行：`spec.verdict`、`quality.verdict`、`verify.evidence` 均为 PASS，任务复核 5/5、0 blocking；专项 E2E 薄入口与 runner 均无 structural-quality finding。
 - [x] fork 发布已完成：`a5116107/openai-plus-vxt` 的 `main` 和集成分支已同步 0.0.37 集成结果，预发布 `v0.0.37-ssot.1` 已上传双端产物、哈希清单和回滚说明。
-- [ ] 上游交付仍受权限门阻断：向 `suyancc/openai-plus-vxt` 推送返回 403，当前令牌也无权创建上游 PR。
+- [ ] 上游交付仍受权限门阻断：向 `suyancc/openai-plus-vxt` 推送返回 403；2026-08-09 从 `a5116107:codex/ssot-closeout` 创建 PR 的 GraphQL 与 REST 路径也均返回 403 `Resource not accessible by personal access token`。
 - [x] 最新严格质量总门已通过；当前变更的 change/shape budget、anti-mud、功能测试、双端构建、浏览器夹具与敏感信息扫描均为 PASS，历史超大文件和 184 文件迁移规模继续登记为仓库级结构债务。
 
 命令实际通过后再勾选并记录测试数量；文件存在不计为 PASS。
@@ -111,7 +111,8 @@
 - [x] Preflight 支持外部 `SPM_E2E_BACKEND_BASE_URL` 或内嵌 `SPM_E2E_STRIPE_SECRET_KEY` 二选一，只记录后端模式/accepted 布尔值和缺失变量名。
 - [x] 浏览器 E2E 入口已缩减为 32 行模式分发，运行职责迁入 `tests/support/saved-payment-live-e2e-runner.mjs`；发布脱敏扫描覆盖两个 E2E support 模块。
 - [x] 用户 mailbox URL 的真实注册链已完成，成功证据位于 `.context-snapshots/e2e-user-mailbox-retry/chrome-e2e-result.json`；邮箱、URL token、OTP、Cookie 和 access token 均未进入证据。
-- [x] 当前独立 profile `.context-snapshots/profiles/saved-payment-live` 直连 headed 探测返回 session HTTP 200、账号/access token 存在、服务端列表 HTTP 200、支付方式数量 0、default=false；证据为 `.context-snapshots/saved-payment-live-e2e/profile-probe.latest.json`。
+- [x] 2026-08-05 历史独立 profile `.context-snapshots/profiles/saved-payment-live` 直连 headed 探测返回 session HTTP 200、账号/access token 存在、服务端列表 HTTP 200、支付方式数量 0、default=false；该结果仅代表当次运行，不代表当前环境仍持有会话。
+- [x] 2026-08-09 当前环境 preflight：扩展构建、Playwright 与浏览器均就绪，但 `profileConfigured=false`、`testBackendMode=missing`、`inputsConfigured=false`；profile probe 为 `accountPresent=false`、`accessTokenPresent=false`、支付方式数量 0，未进入 SetupIntent 写操作。
 - [x] 2026-08-05 profile probe 新增 `SPM_E2E_SKIP_AUTH_PROXY=true` 直连模式，默认代理路径保持不变；3/3 后端/入口测试通过。
 - [x] 2026-08-05 Profile 10 复核已判定不适合作为 E2E 根目录：它是正在使用的 Chrome 子 profile，不是独立 `Local State + Default/` user-data 副本；后续已由上述独立 profile 替代。
 - [x] 同一 Stripe 测试商户的 publishable/secret key 已通过进程级临时输入完成联机运行；完整 key、client secret、Cookie 与卡数据均未写入仓库证据。
