@@ -20,3 +20,4 @@
 | QR-16 | 显式全仓结构基线与低风险复杂度收敛 | 完成（本地范围） | 169 文件严格扫描为 91 finding / 0 blocker；`runner-format.ts` 聚焦扫描 0 finding，3 项兼容回归通过；旧 184 文件差异不再作为任务代理 |
 | QR-17 | 将全仓结构基线转成自动回退门 | 完成（本地范围） | `pnpm test:structural-baseline` 从 Git 文件范围复算 169/91/84/7/0 上限并阻止 `runner-format` 告警回归 |
 | QR-18 | 统一 live readiness 脱敏审计门 | 完成（本地范围） | `pnpm audit:live` 汇总身份、目标域、出口互异性、Saved Payment preflight 和端口状态；`--strict` 未满足完整 live 条件时 fail-closed |
+| QR-19 | 三阶段出口与多方式 live 计划门 | 完成（本地范围） | Auth/Checkout/Billing 必须显式配置、成功访问 ChatGPT 且出口互异；国家、至少两种支付方式和 Checkout UI 模式必须形成有效计划；Saved Payment `preflightOk` 正确进入总门 |

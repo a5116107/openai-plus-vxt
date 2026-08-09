@@ -3,9 +3,9 @@
 | 验证项 | 命令 | 当前结果 |
 | --- | --- | --- |
 | TypeScript | `pnpm compile` | PASS，0 error |
-| 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，146/146 |
-| Live readiness 单元 | `pnpm test:live-readiness` | PASS，5/5；出口互异性只统计成功访问 ChatGPT 目标域的 trace |
-| Live readiness 当前审计 | `pnpm audit:live` | PASS（审计完成）；`targetReachable=true`、`uniqueEgressCount=1`、`identityReady=false`、`paymentReady=false`、`fullLiveReady=false`，证据脱敏 |
+| 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，147/147 |
+| Live readiness 单元 | `pnpm test:live-readiness` | PASS，8/8；只统计成功 ChatGPT trace，三阶段必须互异，多方式计划和 Saved Payment 总门均有反例覆盖 |
+| Live readiness 当前审计 | `pnpm audit:live` | PASS（审计完成）；`targetReachable=true`、`uniqueEgressCount=1`，身份、三阶段出口、支付和多方式计划均为 false，`fullLiveReady=false`，证据脱敏 |
 | Saved Payment 后端 | `pnpm test:saved-payment-backend` | PASS，3/3 |
 | 因素分析 | `node tools/_eligibility_analysis_smoke.mjs` | PASS |
 | 平衡排程 | `node tools/_eligibility_experiment_smoke.mjs` | PASS |

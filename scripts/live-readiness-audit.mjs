@@ -15,6 +15,8 @@ const TRACE_TARGETS = {
   chatgpt: 'https://chatgpt.com/cdn-cgi/trace',
 };
 const DEFAULT_PROXY = 'socks5h://127.0.0.1:10808';
+const LIVE_STAGES = ['auth', 'checkout', 'billing'];
+const LIVE_PAYMENT_METHODS = new Set(['hosted', 'paypal', 'momo', 'gopay', 'ideal', 'upi', 'pix', 'blik', 'twint', 'kakao']);
 
 export function inspectJwt(value, now = Math.floor(Date.now() / 1000)) {
   const raw = String(value || '').trim();
@@ -81,49 +83,120 @@ function liveTargetIp(observation) {
   return String(observation.trace.ip || '');
 }
 
-export function buildReadinessReport(input) {
-  const traces = input.traces || [];
+function uniqueList(value, normalize) {
+  return [...new Set(String(value || '').split(',').map((item) => normalize(item.trim())).filter(Boolean))];
+}
+
+function boundedInteger(value, fallback, min, max) {
+  const parsed = Number.parseInt(String(value || ''), 10);
+  return Math.max(min, Math.min(max, Number.isFinite(parsed) ? parsed : fallback));
+}
+
+export function parseLiveProbePlan(env = {}) {
+  const countries = uniqueList(env.OPX_LIVE_COUNTRIES, (item) => (/^[A-Za-z]{2}$/.test(item) ? item.toUpperCase() : ''));
+  const requested = uniqueList(env.OPX_LIVE_PAYMENT_METHODS, (item) => item.toLowerCase());
+  const paymentMethods = requested.filter((item) => LIVE_PAYMENT_METHODS.has(item));
+  const checkoutUiMode = ['hosted', 'custom', 'both'].includes(String(env.OPX_LIVE_CHECKOUT_UI_MODE || '').toLowerCase())
+    ? String(env.OPX_LIVE_CHECKOUT_UI_MODE).toLowerCase()
+    : '';
+  return {
+    ready: countries.length > 0 && paymentMethods.length >= 2 && Boolean(checkoutUiMode),
+    countries,
+    paymentMethods,
+    invalidPaymentMethodCount: requested.length - paymentMethods.length,
+    checkoutUiMode,
+    sampleCount: boundedInteger(env.OPX_LIVE_SAMPLE_COUNT, 8, 1, 20),
+    rounds: boundedInteger(env.OPX_LIVE_ROUNDS, 1, 1, 10),
+    requireZero: !['0', 'false', 'off', 'no'].includes(String(env.OPX_LIVE_REQUIRE_ZERO || '1').toLowerCase()),
+  };
+}
+
+export function buildStageEgressSummary(traces = []) {
+  const stages = LIVE_STAGES.map((stage) => {
+    const observation = traces.find((item) => item.stage === stage && item.target === 'chatgpt');
+    return {
+      stage,
+      configured: Boolean(observation?.proxy?.configured && observation.proxy.accepted),
+      reachable: Boolean(observation?.trace?.ok),
+      trace: publicTrace(observation?.trace),
+    };
+  });
+  const stageIps = new Set(traces.filter((item) => LIVE_STAGES.includes(item.stage)).map(liveTargetIp).filter(Boolean));
+  return {
+    ready: stages.every((item) => item.configured && item.reachable) && stageIps.size === LIVE_STAGES.length,
+    uniqueEgressCount: stageIps.size,
+    stages,
+  };
+}
+
+export function publicPaymentPreflight(runtime) {
+  return { ok: Boolean(runtime?.preflightOk), ...(runtime?.preflight || {}) };
+}
+
+function buildReadinessGates(input, traces, stageEgress, uniqueEgressCount) {
   const targetReachable = traces.some((item) => item.target === 'chatgpt' && item.trace.ok);
   const identityReady = Boolean(input.token?.valid || Number(input.sessions?.valid || 0) > 0);
+  const gates = {
+    targetReachable,
+    identityReady,
+    exitDiversityReady: uniqueEgressCount >= 3,
+    multiStageEgressReady: stageEgress.ready,
+    paymentReady: Boolean(input.payment?.ok),
+    probePlanReady: Boolean(input.probePlan?.ready),
+  };
+  return { ...gates, fullLiveReady: Object.values(gates).every(Boolean) };
+}
+
+function blockedReasonsFor(gates) {
+  return [
+    ['targetReachable', 'target-unreachable'],
+    ['identityReady', 'identity-missing'],
+    ['exitDiversityReady', 'fewer-than-three-unique-egresses'],
+    ['multiStageEgressReady', 'multi-stage-egress-missing'],
+    ['paymentReady', 'saved-payment-preflight'],
+    ['probePlanReady', 'probe-plan-missing'],
+  ].filter(([gate]) => !gates[gate]).map(([, reason]) => reason);
+}
+
+function publicIdentity(input) {
+  return {
+    tokenConfigured: Boolean(input.token?.present),
+    tokenValid: Boolean(input.token?.valid),
+    sessionFiles: Number(input.sessions?.files || 0),
+    validSessions: Number(input.sessions?.valid || 0),
+  };
+}
+
+function publicObservation(item) {
+  return {
+    target: item.target,
+    plane: item.plane,
+    stage: item.stage || '',
+    proxy: item.proxy,
+    trace: publicTrace(item.trace),
+  };
+}
+
+export function buildReadinessReport(input) {
+  const traces = input.traces || [];
   const egresses = new Set(traces.map(liveTargetIp).filter(Boolean));
   const uniqueEgressCount = egresses.size;
-  const exitDiversityReady = uniqueEgressCount >= 3;
-  const paymentReady = Boolean(input.payment?.ok);
-  const fullLiveReady = Boolean(targetReachable && identityReady && exitDiversityReady && paymentReady);
-  const blockedReasons = [
-    [targetReachable, 'target-unreachable'],
-    [identityReady, 'identity-missing'],
-    [exitDiversityReady, 'fewer-than-three-unique-egresses'],
-    [paymentReady, 'saved-payment-preflight'],
-  ].filter(([ready]) => !ready).map(([, reason]) => reason);
+  const stageEgress = buildStageEgressSummary(traces);
+  const gates = buildReadinessGates(input, traces, stageEgress, uniqueEgressCount);
   return {
     schemaVersion: 1,
     kind: 'live_readiness_audit',
     generatedAt: input.generatedAt || new Date().toISOString(),
-    gates: {
-      targetReachable,
-      identityReady,
-      exitDiversityReady,
-      paymentReady,
-      fullLiveReady,
-    },
-    identity: {
-      tokenConfigured: Boolean(input.token?.present),
-      tokenValid: Boolean(input.token?.valid),
-      sessionFiles: Number(input.sessions?.files || 0),
-      validSessions: Number(input.sessions?.valid || 0),
-    },
+    gates,
+    identity: publicIdentity(input),
     egress: {
       uniqueEgressCount,
-      observations: traces.map((item) => ({
-        target: item.target,
-        plane: item.plane,
-        proxy: item.proxy,
-        trace: publicTrace(item.trace),
-      })),
+      stageEgress,
+      observations: traces.map(publicObservation),
     },
     payment: input.payment,
-    blockedReasons,
+    probePlan: input.probePlan,
+    blockedReasons: blockedReasonsFor(gates),
   };
 }
 
@@ -149,7 +222,7 @@ async function inspectSessions(directory, now = Math.floor(Date.now() / 1000)) {
   return result;
 }
 
-async function probeTrace(target, proxy, plane) {
+async function probeTrace(target, proxy, plane, stage = '') {
   const args = ['-sS', '--max-time', '15'];
   if (proxy) args.push('--proxy', proxy);
   args.push('-w', '__HTTP__:%{http_code}', TRACE_TARGETS[target]);
@@ -157,11 +230,11 @@ async function probeTrace(target, proxy, plane) {
     const { stdout } = await execFileAsync(process.platform === 'win32' ? 'curl.exe' : 'curl', args, { maxBuffer: 512 * 1024 });
     const marker = String(stdout).match(/__HTTP__:(\d{3})/);
     const trace = parseTraceOutput(String(stdout).replace(/__HTTP__:\d{3}/, ''), marker ? Number(marker[1]) : 0);
-    return { target, plane, proxy: publicProxy(proxy), trace };
+    return { target, plane, stage, proxy: publicProxy(proxy), trace };
   } catch (error) {
     const stdout = String(error?.stdout || '');
     const marker = stdout.match(/__HTTP__:(\d{3})/);
-    return { target, plane, proxy: publicProxy(proxy), trace: parseTraceOutput(stdout, marker ? Number(marker[1]) : 0) };
+    return { target, plane, stage, proxy: publicProxy(proxy), trace: parseTraceOutput(stdout, marker ? Number(marker[1]) : 0) };
   }
 }
 
@@ -196,17 +269,22 @@ async function main() {
   const frontProxy = env.OPX_LIVE_FRONT_PROXY || DEFAULT_PROXY;
   const extraProxies = String(env.OPX_LIVE_EXIT_PROXIES || '').split(',').map((item) => item.trim()).filter(Boolean);
   const proxies = [...new Set([frontProxy, ...extraProxies])];
+  const stageProxies = LIVE_STAGES.map((stage) => ({ stage, proxy: String(env[`OPX_LIVE_${stage.toUpperCase()}_PROXY`] || '').trim() }));
   const traces = [];
   for (const target of Object.keys(TRACE_TARGETS)) {
     traces.push(await probeTrace(target, '', 'direct'));
     for (const proxy of proxies) traces.push(await probeTrace(target, proxy, 'proxy'));
+  }
+  for (const item of stageProxies) {
+    if (item.proxy) traces.push(await probeTrace('chatgpt', item.proxy, 'stage', item.stage));
   }
   const ports = {};
   for (const port of [10808, 7890, 18090]) ports[String(port)] = await canListen(port);
   const report = buildReadinessReport({
     token,
     sessions,
-    payment: runtime.preflight,
+    payment: publicPaymentPreflight(runtime),
+    probePlan: parseLiveProbePlan(env),
     traces,
     generatedAt: new Date().toISOString(),
   });

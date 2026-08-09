@@ -77,3 +77,9 @@
 - `pnpm test:structural-baseline` 从 Git 跟踪文件实时生成严格扫描范围，不依赖手写文件列表或聊天中的历史数字。
 - 运行门要求覆盖文件保持 169、总 finding 不超过 91、advisory 不超过 84、baseline 不超过 7、blocker 为 0，且 `runner-format.ts` 不重新出现告警。
 - 结构债务下降会直接通过；覆盖变化或 finding 增长必须先解释并显式更新 SSOT，避免无声漂移。
+
+## 2026-08-09 QR-19 Live 分阶段与多方式计划门
+
+- `pnpm audit:live` 分别验证 Auth、Checkout、Billing 的显式代理，只接受成功访问 ChatGPT 且实际出口三段互异的配置；通用代理数量不再替代阶段真实性。
+- 多方式计划必须显式给出国家、至少两种受支持支付方式和 `hosted/custom/both` UI 模式；无配置、无效方式或单方式计划均保持 fail-closed。
+- Saved Payment 使用运行时 `preflightOk` 进入统一支付门，公开证据只保留布尔状态、缺失变量名和脱敏网络摘要。

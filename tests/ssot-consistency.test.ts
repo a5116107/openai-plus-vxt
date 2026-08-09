@@ -118,3 +118,14 @@ test('QR-16 and QR-17 structural baseline contract is consistent and executable'
   assert.match(qualityRemediationTasks, /QR-17.*test:structural-baseline/);
   assert.doesNotMatch(rootIndex, /完整 184 文件迁移仍需/);
 });
+
+test('QR-19 live stage and multi-method plan contract is explicit', () => {
+  for (const name of ['OPX_LIVE_AUTH_PROXY', 'OPX_LIVE_CHECKOUT_PROXY', 'OPX_LIVE_BILLING_PROXY']) {
+    assert.match(rootIndex, new RegExp(`\\b${name}\\b`));
+  }
+  for (const name of ['OPX_LIVE_COUNTRIES', 'OPX_LIVE_PAYMENT_METHODS', 'OPX_LIVE_CHECKOUT_UI_MODE']) {
+    assert.match(rootIndex, new RegExp(`\\b${name}\\b`));
+  }
+  assert.match(qualityRemediationTasks, /QR-19.*三阶段出口与多方式 live 计划门/);
+  assert.match(qualityRemediationVerify, /Live readiness 单元.*8\/8/);
+});
