@@ -95,7 +95,7 @@ npm run test:e2e-proxy-stages
 | 脱敏 | 高风险密钥模式扫描 + 收据归一化测试 | 无命中；不持久化 token/payload |
 | 质量复核 | `spec.verdict.latest.json`、`quality.verdict.latest.json`、`verify.evidence.latest.json` | 三项均 `pass`，0 issue |
 
-2026-08-08 的 0.0.37 集成交付已推送到 fork 的集成分支与 `main`，预发布 `v0.0.37-ssot.1` 已上传。上游仓库推送和 PR 创建分别受 403 与令牌权限阻断。最新 `quality-guard review-entry --no-chain` 为 SUCCESS，blocker=0；跨 184 文件迁移的 change/shape budget 继续作为 advisory 结构债务。TPP 定向逻辑、125 项全量测试、3 项后端测试、双端构建、自包含三阶段代理 E2E 与 Plus Closure fixture 均通过。
+2026-08-08 的 0.0.37 集成交付已推送到 fork 的集成分支与 `main`，预发布 `v0.0.37-ssot.1` 已上传。上游仓库推送和 PR 创建分别受 403 与令牌权限阻断。当次 `quality-guard review-entry --no-chain` 为 SUCCESS，blocker=0；当时的 184 文件数字是分支差异规模，不是当前任务数量。TPP 定向逻辑、125 项全量测试、3 项后端测试、双端构建、自包含三阶段代理 E2E 与 Plus Closure fixture 均通过；当前结构口径统一引用根 SSOT 的 QR-16 基线。
 
 ## 9. 隔离交付复核（2026-08-07）
 

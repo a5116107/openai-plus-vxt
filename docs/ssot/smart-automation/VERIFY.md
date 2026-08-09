@@ -66,7 +66,7 @@
 - 发布：fork `a5116107/openai-plus-vxt` 的 `main` 与 `codex/full-ssot-integration` 均指向集成提交；预发布 `v0.0.37-ssot.1` 已上传 Chrome ZIP、Firefox XPI、发布清单和回滚说明。
 - 产物 SHA-256：Chrome ZIP `4fa4db10814dd4c8514d2f357311ef100e7a2b3a3af1db31730a671a8fd74693`；Firefox XPI `5739225446632b2e613ea9185216ecdeacb30c551a29456861f6d9a5e946f008`。
 - 上游状态：`suyancc/openai-plus-vxt` 写入返回 403，当前令牌也缺少创建上游 PR 的权限；上游 `main` 仍为 `d856454f82e7fce14c35603a72e0f2f3e1ca69e9`。
-- 最新质量复核：`quality-guard review-entry --no-chain` 为 SUCCESS，spec/quality/verify-evidence/proof/review blocker 均为 0；184 文件迁移的 change/shape budget 与既有超大文件继续作为 advisory 结构债务，未伪造严格预算 PASS。
+- 最新质量复核：`quality-guard review-entry --no-chain` 为 SUCCESS，spec/quality/verify-evidence/proof/review blocker 均为 0；当前全仓结构基线为 168 文件、91 finding（84 advisory、7 baseline）、0 blocker，其余结构 finding 未伪造为零债务。
 
 ## Plus 双 Checkout 闭环
 

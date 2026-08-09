@@ -7,6 +7,9 @@ const repoRoot = path.resolve(import.meta.dirname, '..');
 const ssotRoot = path.join(repoRoot, 'docs/ssot');
 const rootIndex = fs.readFileSync(path.join(ssotRoot, 'README.md'), 'utf8');
 const savedPaymentVerify = fs.readFileSync(path.join(ssotRoot, 'saved-payment-methods/VERIFY.md'), 'utf8');
+const qualityRemediationReadme = fs.readFileSync(path.join(ssotRoot, 'quality-remediation/README.md'), 'utf8');
+const qualityRemediationTasks = fs.readFileSync(path.join(ssotRoot, 'quality-remediation/TASKS.md'), 'utf8');
+const qualityRemediationVerify = fs.readFileSync(path.join(ssotRoot, 'quality-remediation/VERIFY.md'), 'utf8');
 
 function listMarkdownFiles(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -93,4 +96,15 @@ test('QR-15 current external-gate evidence is dated and fail-closed', () => {
   assert.match(savedPaymentVerify, /testBackendMode=missing/);
   assert.match(savedPaymentVerify, /GraphQL.*REST.*403/);
   assert.doesNotMatch(savedPaymentVerify, /当前独立 profile/);
+});
+
+test('QR-16 current structural baseline is consistent and retires the historical diff proxy', () => {
+  for (const document of [rootIndex, qualityRemediationReadme, qualityRemediationTasks, qualityRemediationVerify]) {
+    assert.match(document, /168 (?:个)?文件/);
+    assert.match(document, /91 (?:个 )?finding/);
+    assert.match(document, /0 blocker/);
+  }
+  assert.match(rootIndex, /84 advisory、7 baseline/);
+  assert.match(qualityRemediationVerify, /runner-format\.ts.*(?:0 finding|告警为 0)/s);
+  assert.doesNotMatch(rootIndex, /完整 184 文件迁移仍需/);
 });

@@ -25,100 +25,136 @@ export function summarizeActionData(data: unknown): string {
   if (!isRecord(data)) {
     return '';
   }
+  return [
+    ...summarizePageData(data),
+    ...summarizePaymentControlData(data),
+    ...summarizeInputDiscoveryData(data),
+    ...summarizeInputFillData(data),
+    ...summarizeInputStateData(data),
+    ...summarizeButtonData(data),
+  ].join('；');
+}
+
+function summarizePageData(actionData: Record<string, unknown>): string[] {
   const parts: string[] = [];
-  const url = String(data.url || '');
-  const pageKind = String(data.pageKind || '');
+  const url = String(actionData.url || '');
+  const pageKind = String(actionData.pageKind || '');
   if (url) {
     parts.push(`页面=${shortUrl(url)}`);
   }
   if (pageKind) {
     parts.push(`状态=${pageKind}`);
   }
-  if ('tabStatus' in data) {
-    parts.push(`加载=${String(data.tabStatus || '未知')}`);
+  if ('tabStatus' in actionData) {
+    parts.push(`加载=${String(actionData.tabStatus || '未知')}`);
   }
-  if ('navigationMs' in data) {
-    parts.push(`跳转耗时=${Math.round(Number(data.navigationMs || 0) / 100) / 10}s`);
+  if ('navigationMs' in actionData) {
+    parts.push(`跳转耗时=${Math.round(Number(actionData.navigationMs || 0) / 100) / 10}s`);
   }
-  const loadMessage = String(data.loadMessage || '');
+  const loadMessage = String(actionData.loadMessage || '');
   if (loadMessage) {
     parts.push(`加载结果=${loadMessage}`);
   }
-  const readyMessage = String(data.readyMessage || '');
+  const readyMessage = String(actionData.readyMessage || '');
   if (readyMessage) {
     parts.push(`控件结果=${readyMessage}`);
   }
-  if ('amountFound' in data) {
-    parts.push(`金额=${data.amountFound ? String(data.amountText || '已找到') : '未找到'}`);
+  return parts;
+}
+
+function summarizePaymentControlData(actionData: Record<string, unknown>): string[] {
+  const parts: string[] = [];
+  if ('amountFound' in actionData) {
+    parts.push(`金额=${actionData.amountFound ? String(actionData.amountText || '已找到') : '未找到'}`);
   }
-  if ('paypalButtonFound' in data) {
-    parts.push(`PayPal按钮=${data.paypalButtonFound ? '是' : '否'}`);
+  if ('paypalButtonFound' in actionData) {
+    parts.push(`PayPal按钮=${actionData.paypalButtonFound ? '是' : '否'}`);
   }
-  if ('submitButtonFound' in data) {
-    parts.push(`提交按钮=${data.submitButtonFound ? '是' : '否'}`);
+  if ('submitButtonFound' in actionData) {
+    parts.push(`提交按钮=${actionData.submitButtonFound ? '是' : '否'}`);
   }
-  if ('createAccountButtonFound' in data) {
-    parts.push(`创建账户=${data.createAccountButtonFound ? '是' : '否'}`);
+  if ('createAccountButtonFound' in actionData) {
+    parts.push(`创建账户=${actionData.createAccountButtonFound ? '是' : '否'}`);
   }
-  if ('emailInputFound' in data) {
-    parts.push(`PayPal邮箱框=${data.emailInputFound ? '是' : '否'}`);
+  if ('emailInputFound' in actionData) {
+    parts.push(`PayPal邮箱框=${actionData.emailInputFound ? '是' : '否'}`);
   }
-  if ('continueButtonFound' in data) {
-    parts.push(`继续按钮=${data.continueButtonFound ? '是' : '否'}`);
+  if ('continueButtonFound' in actionData) {
+    parts.push(`继续按钮=${actionData.continueButtonFound ? '是' : '否'}`);
   }
-  if ('billingConsentButtonFound' in data) {
-    parts.push(`同意按钮=${data.billingConsentButtonFound ? '是' : '否'}`);
+  if ('billingConsentButtonFound' in actionData) {
+    parts.push(`同意按钮=${actionData.billingConsentButtonFound ? '是' : '否'}`);
   }
-  if ('readyState' in data) {
-    parts.push(`ready=${String(data.readyState || '')}`);
+  if ('readyState' in actionData) {
+    parts.push(`ready=${String(actionData.readyState || '')}`);
   }
-  if ('inputFound' in data) {
-    parts.push(`输入框=${data.inputFound ? String(data.inputSelector || '已找到') : '未找到'}`);
+  return parts;
+}
+
+function summarizeInputDiscoveryData(actionData: Record<string, unknown>): string[] {
+  const parts: string[] = [];
+  if ('inputFound' in actionData) {
+    parts.push(`输入框=${actionData.inputFound ? String(actionData.inputSelector || '已找到') : '未找到'}`);
   }
-  if ('inputValueLength' in data || 'expectedLength' in data) {
-    parts.push(`值长度=${Number(data.inputValueLength || 0)}/${Number(data.expectedLength || 0)}`);
+  if ('inputValueLength' in actionData || 'expectedLength' in actionData) {
+    parts.push(`值长度=${Number(actionData.inputValueLength || 0)}/${Number(actionData.expectedLength || 0)}`);
   }
-  if ('inputMatchesExpected' in data) {
-    parts.push(`值匹配=${data.inputMatchesExpected ? '是' : '否'}`);
+  if ('inputMatchesExpected' in actionData) {
+    parts.push(`值匹配=${actionData.inputMatchesExpected ? '是' : '否'}`);
   }
-  const fillMethod = String(data.fillMethod || '');
+  return parts;
+}
+
+function summarizeInputFillData(actionData: Record<string, unknown>): string[] {
+  const parts: string[] = [];
+  const fillMethod = String(actionData.fillMethod || '');
   if (fillMethod) {
     parts.push(`写入方式=${fillMethod}`);
   }
-  if ('fillMethodOk' in data) {
-    parts.push(`写入成功=${data.fillMethodOk ? '是' : '否'}`);
+  if ('fillMethodOk' in actionData) {
+    parts.push(`写入成功=${actionData.fillMethodOk ? '是' : '否'}`);
   }
-  if ('fillImmediateLength' in data || 'fillAfterEventLength' in data) {
-    parts.push(`写入长度=${Number(data.fillImmediateLength || 0)}->${Number(data.fillAfterEventLength || 0)}`);
+  if ('fillImmediateLength' in actionData || 'fillAfterEventLength' in actionData) {
+    parts.push(`写入长度=${Number(actionData.fillImmediateLength || 0)}->${Number(actionData.fillAfterEventLength || 0)}`);
   }
-  const fillMessage = String(data.fillMessage || '');
+  const fillMessage = String(actionData.fillMessage || '');
   if (fillMessage) {
     parts.push(`写入结果=${fillMessage}`);
   }
-  if ('inputReadOnly' in data) {
-    parts.push(`只读=${data.inputReadOnly ? '是' : '否'}`);
+  return parts;
+}
+
+function summarizeInputStateData(actionData: Record<string, unknown>): string[] {
+  const parts: string[] = [];
+  if ('inputReadOnly' in actionData) {
+    parts.push(`只读=${actionData.inputReadOnly ? '是' : '否'}`);
   }
-  if ('inputDisabled' in data) {
-    parts.push(`禁用=${data.inputDisabled ? '是' : '否'}`);
+  if ('inputDisabled' in actionData) {
+    parts.push(`禁用=${actionData.inputDisabled ? '是' : '否'}`);
   }
-  if ('inputConnected' in data) {
-    parts.push(`连接=${data.inputConnected ? '是' : '否'}`);
+  if ('inputConnected' in actionData) {
+    parts.push(`连接=${actionData.inputConnected ? '是' : '否'}`);
   }
-  if ('buttonFound' in data) {
-    parts.push(`按钮=${data.buttonFound ? String(data.buttonText || data.buttonSelector || '已找到') : '未找到'}`);
+  return parts;
+}
+
+function summarizeButtonData(actionData: Record<string, unknown>): string[] {
+  const parts: string[] = [];
+  if ('buttonFound' in actionData) {
+    parts.push(`按钮=${actionData.buttonFound ? String(actionData.buttonText || actionData.buttonSelector || '已找到') : '未找到'}`);
   }
-  if ('buttonDisabled' in data) {
-    parts.push(`按钮禁用=${data.buttonDisabled ? '是' : '否'}`);
+  if ('buttonDisabled' in actionData) {
+    parts.push(`按钮禁用=${actionData.buttonDisabled ? '是' : '否'}`);
   }
-  const validationText = String(data.validationText || '');
+  const validationText = String(actionData.validationText || '');
   if (validationText) {
     parts.push(`页面提示=${validationText}`);
   }
-  const activeElement = String(data.activeElement || '');
+  const activeElement = String(actionData.activeElement || '');
   if (activeElement) {
     parts.push(`焦点=${activeElement}`);
   }
-  return parts.filter(Boolean).join('；');
+  return parts;
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

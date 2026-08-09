@@ -18,7 +18,7 @@
 - skills consistency、stack-run、quality-guard 必须保留命令输出；本地 bootstrap 代理使用 Git 本地排除清单，不进入产品提交。
 - 本地交付验证使用 `--no-chain` 停在 verify，避免把未请求的 GitHub 同步和部署事务作为 XPI 验收前置条件。
 - 0.0.37 Chrome ZIP 与 Firefox XPI 已发布到 fork 预发布，并记录 SHA-256 与回滚说明。
-- 184 文件迁移超过 change/shape budget 的事实保持 advisory 结构债务，不伪造严格预算 PASS。
+- 当前结构事实由显式全仓扫描维护：168 个文件、91 个 finding（84 advisory、7 baseline）、0 blocker；旧版“184 文件迁移”仅是历史分支差异规模，不再充当当前任务清单或验收口径。
 
 ## 2026-07-29 全流程回归补充
 
@@ -64,3 +64,9 @@
 - Saved Payment 历史 profile 成功证据标注为 2026-08-05 当次运行，不再表述为当前可用会话。
 - 2026-08-09 preflight 与 profile probe 独立记录当前环境缺少 profile、支付输入和测试后端，且未触发支付写操作。
 - 上游 PR 创建同时验证 GraphQL 与 REST 路径，两者均因当前 Token 权限返回 403；该权限门继续保持未完成。
+
+## 2026-08-09 QR-16 显式结构基线
+
+- 严格结构扫描通过 `git ls-files` 显式覆盖 `src/`、`entrypoints/`、`scripts/` 与 `tests/support/` 的 168 个源码文件，结果为 91 个 finding（84 advisory、7 baseline）、0 blocker。
+- `summarizeActionData` 按页面、支付控件、输入发现、输入写入、输入状态和按钮提示拆分，最大复杂度从 65 降至严格门阈值以内，`runner-format.ts` 聚焦扫描为 0 finding。
+- 3 项聚焦回归锁定全部字段顺序、中文文案、falsy 字段和非对象输入语义；旧版 184 文件分支差异不再写作当前可执行任务数量。
