@@ -108,7 +108,7 @@ test('QR-15 current external-gate evidence is dated and fail-closed', () => {
 
 test('QR-16 and QR-17 structural baseline contract is consistent and executable', () => {
   for (const document of [rootIndex, qualityRemediationReadme, qualityRemediationTasks, qualityRemediationVerify]) {
-    assert.match(document, /168 (?:个)?文件/);
+    assert.match(document, /169 (?:个)?文件/);
     assert.match(document, /91 (?:个 )?finding/);
     assert.match(document, /0 blocker/);
   }

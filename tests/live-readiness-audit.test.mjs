@@ -46,6 +46,17 @@ test('full readiness requires identity, three egresses, target reachability and 
   assert.deepEqual(blocked.blockedReasons, ['identity-missing', 'fewer-than-three-unique-egresses', 'saved-payment-preflight']);
 });
 
+test('egress diversity counts only successful ChatGPT target observations', () => {
+  const traces = [
+    { target: 'chatgpt', trace: { ok: true, ip: 'same' } },
+    { target: 'chatgpt', trace: { ok: false, ip: 'failed' } },
+    { target: 'cloudflare', trace: { ok: true, ip: 'other-target' } },
+  ];
+  const report = buildReadinessReport({ token: { valid: true }, payment: { ok: true }, traces });
+  assert.equal(report.egress.uniqueEgressCount, 1);
+  assert.equal(report.gates.exitDiversityReady, false);
+});
+
 test('readiness evidence rejects sensitive shapes', () => {
   assert.equal(containsSensitiveShapes({ token: 'eyJabc.def.ghi', ip: '203.0.113.1' }), true);
   assert.equal(containsSensitiveShapes({ tokenConfigured: true, country: 'SG', httpStatus: 200 }), false);

@@ -6,7 +6,7 @@
 
 - 版本：`0.0.37`。
 - 本地实现：试用资格分类、严格晋级、十类支付方式候选与终链、保存支付方式、Plus 双 Checkout、Auth/Checkout/Billing 多阶段出口、恢复不重放、IndexedDB 归档、独立运营页面、隔离上下文调度和脱敏证据均已落地。
-- 本地验证：TypeScript、149 项全量测试、4 项 live-readiness 脱敏审计测试、6 项 SSOT 一致性测试、1 项可执行结构基线、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、Firefox lint 0/0/0、归档运营页 12/12、资格看板全部断言、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
+- 本地验证：TypeScript 编译、146/146 项全量测试、5 项 live-readiness 脱敏审计测试、6 项 SSOT 一致性测试、1 项可执行结构基线、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、Firefox lint 0/0/0、归档运营页 12/12、资格看板全部断言、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
 - 发布：fork 预发布 `v0.0.37-ssot.2`（`b29982b`）已包含本轮 Chrome ZIP、Firefox ZIP、sources ZIP、发布清单和回滚说明；`v0.0.37-ssot.1` 保留为上一基线。
 - 质量策略：功能、安全、工作流和证据门为 PASS；QR-11 已统一 DOM 挂载并将 Firefox lint 清零，QR-12 已分层自动化终态与 live 身份门，QR-13 已建立 SSOT 自动一致性门，QR-14 已将失败终态 harness 从生产 E2E 入口迁至测试 support，QR-15 已分离历史 live 证据与当前外部门状态，QR-16 已建立显式全仓结构基线并消除 `runner-format` 复杂度告警，QR-17 已将该基线转成自动阻断回退的运行门；当前变更严格 change/shape gate 为 PASS。
 - 2026-08-09 外部门复测：直连与 `127.0.0.1:10808` 经 sing-box 访问 Cloudflare/ChatGPT trace 均为 HTTP 200、SG，匿名出口等同性校验一致，因此仍只有一个实际出口；`18090` 虽由 `chain_proxy_forwarder.py` 监听，但 SOCKS/HTTP 目标域探测均失败，`7890` 未监听。隔离 profile 副本直连及经 SG 出口的浏览器 Session 均为 HTTP 403，三个工作树默认 live session 目录均为 0 个文件/0 个有效会话；Saved Payment preflight 的 profile、测试支付输入和后端配置均未注入，未形成新的账号、access token、支付方式或资格命中证据。
@@ -22,9 +22,9 @@
 | 浏览器身份 | 3 个本机 Chrome Cookie 候选：headless 直连/SG 均 HTTP 403；headed 直连/SG 均 HTTP 200，但账号与 access token 均不存在 | 阻塞资格 |
 | 资格执行器 | `live-eligibility-mullvad.py` 因未找到有效 session 进入 fail-closed | 未运行资格单元 |
 | Saved Payment preflight | 扩展、Playwright、浏览器通过；profile、支付输入、后端均缺失 | 阻塞支付写入 |
-| 多支付方式提链 | 本地方法候选、严格资格保持、终链白名单与不重放门已通过 149/149 回归；live 同轮提链无身份/支付输入 | 本地完成、live 待输入 |
+| 多支付方式提链 | 本地方法候选、严格资格保持、终链白名单与不重放门已通过 146/146 回归；live 同轮提链无身份/支付输入 | 本地完成、live 待输入 |
 
-统一审计命令：`pnpm audit:live`；单元门：`pnpm test:live-readiness`（4/4）。当前证据写入 `.context-snapshots/live-readiness/latest.json`，`--strict` 在身份、三出口或支付门未通过时返回非零并保持 fail-closed。
+统一审计命令：`pnpm audit:live`；单元门：`pnpm test:live-readiness`（5/5）。当前证据写入 `.context-snapshots/live-readiness/latest.json`，`--strict` 在身份、三出口或支付门未通过时返回非零并保持 fail-closed。
 
 ## 领域状态
 
@@ -61,7 +61,7 @@
 
 ## 当前结构基线
 
-2026-08-09 使用显式文件清单严格扫描 `src/`、`entrypoints/`、`scripts/` 与 `tests/support/`：168 个文件、91 个 finding（84 advisory、7 baseline）、0 blocker。`pnpm test:structural-baseline` 从 `git ls-files` 复算相同范围，阻止文件覆盖漂移、finding 增长、blocker 出现或 `runner-format` 回退。旧版“184 文件迁移”是当时的分支差异规模，不再作为当前任务数量或结构验收口径；其余 finding 是已登记的仓库 advisory，不等同于未完成任务 ID。
+2026-08-09 使用显式文件清单严格扫描 `src/`、`entrypoints/`、`scripts/` 与 `tests/support/`：169 个文件、91 个 finding（84 advisory、7 baseline）、0 blocker。`pnpm test:structural-baseline` 从 `git ls-files` 复算相同范围，阻止文件覆盖漂移、finding 增长、blocker 出现或 `runner-format` 回退。旧版“184 文件迁移”是当时的分支差异规模，不再作为当前任务数量或结构验收口径；其余 finding 是已登记的仓库 advisory，不等同于未完成任务 ID。
 
 ## 可选外部扩展验证
 

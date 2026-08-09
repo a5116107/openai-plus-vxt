@@ -47,7 +47,7 @@ test('QR-17 strict structural baseline does not regress', () => {
 
   const result = JSON.parse(fs.readFileSync(resultPath, 'utf8')) as StructuralResult;
   const findings = result.outputs.findings;
-  assert.equal(trackedFiles.length, 168, 'explicit structural scan coverage changed');
+  assert.equal(trackedFiles.length, 169, 'explicit structural scan coverage changed');
   assert.deepEqual(result.outputs.files, trackedFiles, 'scanner file scope differs from git-derived scope');
   assert.equal(result.ok, true);
   assert.equal(result.blockers.length, 0);

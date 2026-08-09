@@ -76,20 +76,26 @@ export function publicTrace(trace) {
   };
 }
 
+function liveTargetIp(observation) {
+  if (observation?.target !== 'chatgpt' || !observation.trace?.ok) return '';
+  return String(observation.trace.ip || '');
+}
+
 export function buildReadinessReport(input) {
   const traces = input.traces || [];
   const targetReachable = traces.some((item) => item.target === 'chatgpt' && item.trace.ok);
   const identityReady = Boolean(input.token?.valid || Number(input.sessions?.valid || 0) > 0);
-  const egresses = new Set(traces.map((item) => item.trace.ip).filter(Boolean));
+  const egresses = new Set(traces.map(liveTargetIp).filter(Boolean));
   const uniqueEgressCount = egresses.size;
   const exitDiversityReady = uniqueEgressCount >= 3;
   const paymentReady = Boolean(input.payment?.ok);
   const fullLiveReady = Boolean(targetReachable && identityReady && exitDiversityReady && paymentReady);
-  const blockedReasons = [];
-  if (!targetReachable) blockedReasons.push('target-unreachable');
-  if (!identityReady) blockedReasons.push('identity-missing');
-  if (!exitDiversityReady) blockedReasons.push('fewer-than-three-unique-egresses');
-  if (!paymentReady) blockedReasons.push('saved-payment-preflight');
+  const blockedReasons = [
+    [targetReachable, 'target-unreachable'],
+    [identityReady, 'identity-missing'],
+    [exitDiversityReady, 'fewer-than-three-unique-egresses'],
+    [paymentReady, 'saved-payment-preflight'],
+  ].filter(([ready]) => !ready).map(([, reason]) => reason);
   return {
     schemaVersion: 1,
     kind: 'live_readiness_audit',
