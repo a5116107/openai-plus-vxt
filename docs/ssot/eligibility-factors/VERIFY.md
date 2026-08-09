@@ -52,6 +52,8 @@
 
 参考环境真实记录为 729 条、58 个账号；明确资格结果 177 条，其中 94 命中。JP Checkout 81/94，IN 0/52；11 个同时覆盖两国的账号全部 JP 高于 IN。26 个重复账号×国家单元仅 1 个发生变化。
 
+2026-08-09 原始证据检索复核：结构化扫描三个工作树及对应全局技能缓存的 2,842 个 JSON，命中 57 个相关文件且 0 解析错误，最大逐次数组仅 12 条；另扫描 29 个 CSV/JSONL/NDJSON，观测导出为 0。Git 全引用与提交路径没有历史观测文件；44 个不可达对象中 32 个 blob 已逐一检查，含观测关键字的 6 个均映射为源码、测试或 SSOT 文档，未出现 `729` 或可导入原始数组。因此下述 729 条统计仍是外部汇总，未通过当前 JSON/CSV 导入器独立复算。
+
 复核结论：纯账号绑定和完全逐请求随机解释均明显减弱；Checkout 国家/路线为当前最强稳定关联。具体出口 IP 因 160 个 IP 中仅 2 个覆盖多个账号而证据不足；TH 9/9、VN 4/4 均集中于单账号，不进入稳定高概率国家推荐。顺序、周期、账号 cohort 与路线配置仍是主要混杂。
 
 ## 浏览器实测
@@ -130,7 +132,7 @@
 - `.context-snapshots/live-eligibility-0.0.33/result-hk-http-29090-minimal.json`：参数化 HTTP 前置成功访问目标域并完成 1×1 流程；修复前扩展代理仍为 `proxy-disabled`，样本为错误且未归因。
 - `.context-snapshots/live-eligibility-0.0.33/result-proxy-sync-failure-smoke.json`：修复后 `proxySetup.saved=true`，Checkout 证据源为 `country-map`，实际 IP/国家和子网均入观测；目标域请求失败时仍为 `network-proxy + invalid`，可归因 0。
 - 严格模式新增提前门：目标域预检失败、显式期望国家错位或扩展健康检查实际国家不匹配时，在账号实验前停止。
-- 2026-08-09 当前只读复测：`10808` 经 sing-box 访问 Cloudflare 与 ChatGPT trace 均为 HTTP 200，实际国家均为 SG；`7890` 未监听。隔离 profile 副本直连和经 SG 出口的 Session 均为 HTTP 403，`accountPresent=false`、`accessTokenPresent=false`，所以没有运行严格 1x1 资格单元，也没有产生 hit/miss 或支付证据。
+- 2026-08-09 当前只读复测：直连与 `10808` 经 sing-box 访问 Cloudflare 与 ChatGPT trace 均为 HTTP 200，实际国家均为 SG，匿名出口等同性校验一致；`18090` 的 Python 链转发监听按 SOCKS/HTTP 探测均失败，`7890` 未监听，因此没有第二个可用出口。隔离 profile 副本直连和经 SG 出口的 Session 均为 HTTP 403，三个工作树默认 live session 目录均为 0 个文件/0 个有效会话，`accountPresent=false`、`accessTokenPresent=false`，所以没有运行严格 1x1 资格单元，也没有产生 hit/miss 或支付证据。
 
 实现复核：请求错误和处理未生效样本保留在原始日志、错误率与漂移输入中，但不进入资格率、因素分组、匹配效应、覆盖矩阵、cooldown 或证据门。候选 Checkout 已创建但严格资格门未通过时，记录保留候选链接状态，同时 `qualificationVerified=false`、`linkUsable=false`。
 

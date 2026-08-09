@@ -56,7 +56,7 @@
 ### 真实证据
 
 - `.context-snapshots/live-eligibility-0.0.31/result.json`：`ok=true`，8/8 单元完成，8 条观测；7 个账号被 401 撤销，1 个账号完成 create + promotion 后被严格页面门判为 miss。
-- 2026-08-09 当前环境只读复测：`10808` 的单一 SG 出口对 Cloudflare/ChatGPT trace 均返回 HTTP 200，但隔离 profile 的浏览器 Session 仍为 HTTP 403；`7890` 未监听，未形成第二个实际国家或新的账号观测。
+- 2026-08-09 当前环境只读复测：直连与 `10808` 的 SG 出口对 Cloudflare/ChatGPT trace 均返回 HTTP 200，匿名出口等同性校验一致；`18090` 链转发监听按 SOCKS/HTTP 探测均失败，`7890` 未监听，仍未形成第二个实际国家。隔离 profile 的浏览器 Session 为 HTTP 403，默认 live session 目录无有效会话，未形成新的账号观测。
 - `.context-snapshots/e2e-eligibility-dashboard-0.0.31/result.json`：全部 37 项检查通过，包含可识别性看板、CSV 往返、导出无 token、移动端无横向溢出。
 - `pnpm test:probe-readiness`：7/7 通过。
 - `pnpm test:payment-runner`：11/11 通过。

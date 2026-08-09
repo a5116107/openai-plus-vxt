@@ -9,7 +9,9 @@
 - 本地验证：TypeScript、149 项全量测试、6 项 SSOT 一致性测试、1 项可执行结构基线、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、Firefox lint 0/0/0、归档运营页 12/12、资格看板全部断言、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
 - 发布：fork 预发布 `v0.0.37-ssot.2`（`b29982b`）已包含本轮 Chrome ZIP、Firefox ZIP、sources ZIP、发布清单和回滚说明；`v0.0.37-ssot.1` 保留为上一基线。
 - 质量策略：功能、安全、工作流和证据门为 PASS；QR-11 已统一 DOM 挂载并将 Firefox lint 清零，QR-12 已分层自动化终态与 live 身份门，QR-13 已建立 SSOT 自动一致性门，QR-14 已将失败终态 harness 从生产 E2E 入口迁至测试 support，QR-15 已分离历史 live 证据与当前外部门状态，QR-16 已建立显式全仓结构基线并消除 `runner-format` 复杂度告警，QR-17 已将该基线转成自动阻断回退的运行门；当前变更严格 change/shape gate 为 PASS。
-- 2026-08-09 外部门复测：`127.0.0.1:10808` 当前经 sing-box 形成单一 SG 出口，Cloudflare 与 ChatGPT trace 均为 HTTP 200；隔离 profile 副本直连及经该出口的浏览器 Session 均为 HTTP 403，未形成账号、access token、支付方式或资格命中证据。上游 PR 创建再次返回 GraphQL 403。
+- 2026-08-09 外部门复测：直连与 `127.0.0.1:10808` 经 sing-box 访问 Cloudflare/ChatGPT trace 均为 HTTP 200、SG，匿名出口等同性校验一致，因此仍只有一个实际出口；`18090` 虽由 `chain_proxy_forwarder.py` 监听，但 SOCKS/HTTP 目标域探测均失败，`7890` 未监听。隔离 profile 副本直连及经 SG 出口的浏览器 Session 均为 HTTP 403，三个工作树默认 live session 目录均为 0 个文件/0 个有效会话；Saved Payment preflight 的 profile、测试支付输入和后端配置均未注入，未形成新的账号、access token、支付方式或资格命中证据。
+- 2026-08-09 外部交付复测：GitHub API 返回上游 `pull=true`、`push=false`，上游 push dry-run 返回 HTTP 403；Chrome/Firefox 商店发布凭据环境变量均未注入。分支已保持同步 fork，上游与商店交付继续保留为外部输入任务。
+- 2026-08-09 EF-26 扩展检索：三个工作树及对应全局技能缓存共扫描 2,842 个 JSON，57 个相关 JSON 全部可解析，最大逐次数组 12 条；29 个 CSV/JSONL/NDJSON 无观测导出。Git 全引用、提交路径和 44 个不可达对象也未找到 729 条原始记录，历史结论继续保持“外部汇总待复算”。
 
 ## 领域状态
 
