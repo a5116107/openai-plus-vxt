@@ -64,5 +64,6 @@ independent=US>JP>DE
 - Mullvad 真实扩展存储有 485 个邮箱记录，但没有 access token 和历史 Probe Observation。
 - 历史批次中本地 `127.0.0.1:10808` 前置出口曾动态变化，最终批次健康检查实际国家为 CA，早期检查曾出现 HK。
 - 2026-08-09 只读复测时 `10808` 为单一 SG 出口，Cloudflare 与 ChatGPT trace 均为 HTTP 200；`7890` 未监听，TH/IN/JP/US 多国家链式出口凭据未注入，因此仍没有多个健康实际国家。
+- 2026-08-10 使用 v2rayN 自动生成的 72 节点测试配置完成只读矩阵复测：55 个端口成功访问 ChatGPT trace，去重为 27 个实际出口并覆盖 JP/SG/US/TW；JP/SG/US 三个代表端口已形成 Auth/Checkout/Billing 单轮互异出口证据。该配置尚未成为持久续租来源，且缺少有效身份，因此仍未进入跨时段平衡单元。
 - 最终真实批次完成 8/8 单元：7 个 `account-auth` error、1 个严格资格 miss、0 个命中、0 个链接入库。唯一有效账号可创建普通 Checkout 并完成 promotion update，但 API 与页面均未确认零元/试用。
 - 当前仅有 1 个真实可用账号，账号、国家、具体出口 IP/ASN 与随机分配四类解释仍缺少可识别的平衡交叉证据。

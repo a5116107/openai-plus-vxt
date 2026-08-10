@@ -57,6 +57,7 @@
 
 - `.context-snapshots/live-eligibility-0.0.31/result.json`：`ok=true`，8/8 单元完成，8 条观测；7 个账号被 401 撤销，1 个账号完成 create + promotion 后被严格页面门判为 miss。
 - 2026-08-09 当前环境只读复测：直连与 `10808` 的 SG 出口对 Cloudflare/ChatGPT trace 均返回 HTTP 200，匿名出口等同性校验一致；`18090` 链转发监听按 SOCKS/HTTP 探测均失败，`7890` 未监听，仍未形成第二个实际国家。隔离 profile 的浏览器 Session 为 HTTP 403，默认 live session 目录无有效会话，未形成新的账号观测。
+- 2026-08-10 出口矩阵复测：v2rayN 自动生成的 72 节点测试配置经 Xray 原生校验通过；55 个端口成功访问 ChatGPT trace，形成 27 个不同实际出口并覆盖 JP/SG/US/TW。选取 JP `10829`、SG `10841`、US `10879` 作为三阶段代表后，Auth/Checkout/Billing 均 HTTP 200 且出口互异，live readiness 的出口多样性、三阶段和 probe plan 门均通过；临时进程与端口已清理。因有效身份和支付 preflight 仍缺失，本轮不生成资格观测，MF-18 继续保持未完成。
 - 同日扩展身份门：3 个含相关 Cookie 的 Chrome 候选在 headed 直连和 headed SG 下均为 Session HTTP 200，但账号/access token 均不存在、支付方式为 0；因此 MF-18 不启动跨国家平衡单元。
 - `.context-snapshots/e2e-eligibility-dashboard-0.0.31/result.json`：全部 37 项检查通过，包含可识别性看板、CSV 往返、导出无 token、移动端无横向溢出。
 - `pnpm test:probe-readiness`：7/7 通过。
