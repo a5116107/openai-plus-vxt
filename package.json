@@ -36,6 +36,7 @@
     "test:live-readiness": "node --test tests/live-readiness-audit.test.mjs",
     "audit:live": "node scripts/live-readiness-audit.mjs",
     "audit:live:strict": "node scripts/live-readiness-audit.mjs --strict",
+    "audit:live:xray": "node scripts/live-readiness-xray-runner.mjs",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {

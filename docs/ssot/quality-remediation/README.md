@@ -84,6 +84,7 @@
 - live 身份门只接受固定 `/backend-api/me` 返回 2xx；JWT 结构、`exp` 未过期和本地会话文件只用于候选筛选，401/403、非 2xx、重定向及网络错误均保持 fail-closed。
 - 多方式计划必须显式给出国家、至少两种受支持支付方式和 `hosted/custom/both` UI 模式；无配置、无效方式或单方式计划均保持 fail-closed。
 - Saved Payment 使用运行时 `preflightOk` 进入统一支付门，公开证据只保留布尔状态、缺失变量名和脱敏网络摘要。
+- `pnpm audit:live:xray` 可在 v2rayN 生成临时 `configTest*.json` 前启动并等待，校验三个阶段路由后直接消费该文件，不复制节点凭据；runner 所有出口都执行自有 Xray 子进程清理与端口释放确认。
 
 ## 2026-08-09 QR-20 目标域稳定性历史门
 

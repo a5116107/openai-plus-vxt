@@ -119,5 +119,6 @@ test('QR-19/QR-20 live stage, plan and stability contracts are explicit', () => 
   assert.match(qualityRemediationTasks, /QR-20.*目标域稳定性历史门/);
   assert.match(rootIndex, /history\.jsonl.*最近 3 次窗口内至少连续 2 次/s);
   assert.match(rootIndex, /audit:live:strict/);
+  assert.match(rootIndex, /audit:live:xray/);
   assert.match(qualityRemediationVerify, /Live readiness 单元.*13\/13/);
 });
