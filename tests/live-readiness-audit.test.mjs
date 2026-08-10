@@ -1,11 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import {
   buildReadinessReport,
   buildStageEgressSummary,
   containsSensitiveShapes,
   evaluateTargetStability,
+  inspectSessions,
   inspectJwt,
   parseLiveProbePlan,
   parseProxyDescriptor,
@@ -13,6 +17,7 @@ import {
   publicPaymentPreflight,
   publicHistoryEntry,
   publicTrace,
+  validateIdentityToken,
 } from '../scripts/live-readiness-audit.mjs';
 
 function jwt(payload) {
@@ -30,6 +35,81 @@ test('JWT inspection is fail-closed and never returns claims', () => {
   assert.equal(Object.prototype.hasOwnProperty.call(valid, 'email'), false);
 });
 
+test('identity validation requires server acceptance and never reads the response body', async () => {
+  const token = jwt({ exp: 200 });
+  let bodyRead = false;
+  const accepted = await validateIdentityToken(token, {
+    now: 100,
+    request: async () => ({ ok: true, status: 200, text: async () => { bodyRead = true; } }),
+  });
+  assert.deepEqual(accepted, {
+    present: true,
+    shapeValid: true,
+    expired: false,
+    locallyValid: true,
+    serverAttempted: true,
+    serverAccepted: true,
+    status: 'accepted',
+    httpStatus: 200,
+    valid: true,
+  });
+  assert.equal(bodyRead, false);
+
+  const rejected = await validateIdentityToken(token, {
+    now: 100,
+    request: async () => ({ ok: false, status: 401 }),
+  });
+  assert.equal(rejected.serverAccepted, false);
+  assert.equal(rejected.status, 'rejected');
+  assert.equal(rejected.valid, false);
+});
+
+test('identity validation skips malformed tokens and fails closed on network errors', async () => {
+  let requestCount = 0;
+  const malformed = await validateIdentityToken('not-a-token', {
+    request: async () => { requestCount += 1; },
+  });
+  assert.equal(malformed.status, 'invalid');
+  assert.equal(malformed.serverAttempted, false);
+  assert.equal(requestCount, 0);
+
+  const unreachable = await validateIdentityToken(jwt({ exp: 200 }), {
+    now: 100,
+    request: async () => { throw new Error('offline'); },
+  });
+  assert.equal(unreachable.status, 'unreachable');
+  assert.equal(unreachable.serverAccepted, false);
+  assert.equal(unreachable.valid, false);
+});
+
+test('session candidates require the same server acceptance before becoming valid', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'opx-live-sessions-'));
+  try {
+    await writeFile(path.join(directory, 'candidate.json'), JSON.stringify({ access_token: jwt({ exp: 200 }) }));
+    await writeFile(path.join(directory, 'invalid.json'), JSON.stringify({ access_token: 'not-a-token' }));
+    let validationCount = 0;
+    const sessions = await inspectSessions(directory, {
+      now: 100,
+      validateToken: async () => {
+        validationCount += 1;
+        return { serverAttempted: true, serverAccepted: false };
+      },
+    });
+    assert.deepEqual(sessions, {
+      configured: true,
+      exists: true,
+      files: 2,
+      candidates: 1,
+      checked: 1,
+      valid: 0,
+      invalid: 2,
+    });
+    assert.equal(validationCount, 1);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('proxy and trace summaries exclude host credentials and IP', () => {
   const descriptor = parseProxyDescriptor('socks5h://user:secret@127.0.0.1:10808');
   assert.equal(descriptor.accepted, true);
@@ -44,8 +124,11 @@ test('full readiness requires identity, three egresses, target reachability and 
     target: 'chatgpt', plane: 'stage', stage: ['auth', 'checkout', 'billing'][index], proxy: { configured: true, accepted: true },
     trace: { ok: true, httpStatus: 200, country: 'SG', colo: 'SIN', ip },
   }));
-  const ready = buildReadinessReport({ token: { valid: true, present: true }, sessions: {}, payment: { ok: true }, probePlan: { ready: true }, targetStability: { ready: true }, traces });
+  const ready = buildReadinessReport({ token: { valid: true, serverAccepted: true, present: true }, sessions: {}, payment: { ok: true }, probePlan: { ready: true }, targetStability: { ready: true }, traces });
   assert.equal(ready.gates.fullLiveReady, true);
+  const localOnly = buildReadinessReport({ token: { valid: true, serverAccepted: false, present: true }, sessions: {}, payment: { ok: true }, probePlan: { ready: true }, targetStability: { ready: true }, traces });
+  assert.equal(localOnly.gates.identityReady, false);
+  assert.equal(localOnly.gates.fullLiveReady, false);
   const blocked = buildReadinessReport({ token: { valid: false }, sessions: { valid: 0 }, payment: { ok: false }, traces: traces.slice(0, 1) });
   assert.equal(blocked.gates.fullLiveReady, false);
   assert.deepEqual(blocked.blockedReasons, [

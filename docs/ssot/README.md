@@ -6,10 +6,10 @@
 
 - 版本：`0.0.37`。
 - 本地实现：试用资格分类、严格晋级、十类支付方式候选与终链、保存支付方式、Plus 双 Checkout、Auth/Checkout/Billing 多阶段出口、恢复不重放、IndexedDB 归档、独立运营页面、隔离上下文调度和脱敏证据均已落地。
-- 本地验证：TypeScript 编译、160/160 项全量测试、10 项 live-readiness 脱敏审计测试、7 项 SSOT 一致性测试、1 项可执行结构基线、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、Firefox lint 0/0/0、归档运营页 12/12、资格看板全部断言、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
+- 本地验证：TypeScript 编译、163/163 项全量测试、13 项 live-readiness 脱敏审计测试、7 项 SSOT 一致性测试、1 项可执行结构基线、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、Firefox lint 0/0/0、归档运营页 12/12、资格看板全部断言、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
 - 发布：fork 预发布 `v0.0.37-ssot.2`（`b29982b`）已包含本轮 Chrome ZIP、Firefox ZIP、sources ZIP、发布清单和回滚说明；`v0.0.37-ssot.1` 保留为上一基线。
 - 质量策略：功能、安全、工作流和证据门为 PASS；QR-11 已统一 DOM 挂载并将 Firefox lint 清零，QR-12 已分层自动化终态与 live 身份门，QR-13 已建立 SSOT 自动一致性门，QR-14 已将失败终态 harness 从生产 E2E 入口迁至测试 support，QR-15 已分离历史 live 证据与当前外部门状态，QR-16/17 已建立并自动执行全仓结构基线，QR-18/19 已建立统一 live readiness、分阶段出口和多方式计划门，QR-20 已增加目标域连续稳定性历史门；当前变更严格 change/shape gate 为 PASS。
-- 2026-08-10 外部门复测（10:52 UTC，第 14 条脱敏历史）：v2rayN 的 72 节点测试配置中 55 个端口成功访问 ChatGPT trace，按实际出口去重为 27 个，覆盖 JP/SG/US/TW；最新审计选取 JP `10829`、SG `10841`、US `10879` 分别绑定 Auth/Checkout/Billing，三个阶段均为 HTTP 200 且出口互异，总出口数为 4，`exitDiversityReady=true`、`multiStageEgressReady=true`。同轮显式配置 JP/SG/US、hosted+paypal 与 hosted UI 后 `probePlanReady=true`，稳定窗口继续为 3/3；严格入口按预期退出 2，阻断原因精确为身份与 Saved Payment preflight，`fullLiveReady=false`。14 条历史及 latest 经敏感形状扫描均无 IP、凭据或卡数据，本轮临时 Xray 进程及 `10829`、`10841`、`10879` 监听已全部清理。
+- 2026-08-10 外部门复测（11:25 UTC，第 16 条脱敏历史）：v2rayN 的 72 节点测试配置中 55 个端口成功访问 ChatGPT trace，按实际出口去重为 27 个，覆盖 JP/SG/US/TW；最新审计选取 JP `10829`、SG `10841`、US `10879` 分别绑定 Auth/Checkout/Billing，三个阶段均为 HTTP 200 且出口互异，总出口数为 4，`exitDiversityReady=true`、`multiStageEgressReady=true`。同轮显式配置 JP/SG/US、hosted+paypal 与 hosted UI 后 `probePlanReady=true`，稳定窗口继续为 3/3；新服务端身份门保持 `identityReady=false`，严格入口按预期退出 2，阻断原因精确为身份与 Saved Payment preflight，`fullLiveReady=false`。16 条历史及 latest 经敏感形状扫描均无 IP、凭据或卡数据，本轮临时 Xray 进程及 `10829`、`10841`、`10879` 监听已全部清理。
 - 2026-08-10 身份与支付输入复核：Chrome Default、Chrome Profile 10、Edge Default 的会话存储共发现 8 个未过期 JWT，但按 `iss`/`aud` 归属筛选后 OpenAI/ChatGPT 候选为 0，故未向 `/backend-api/me` 发送候选验证请求；`OPX_LIVE_TOKEN`、live session/profile 与 Saved Payment profile、测试支付输入、后端或 Stripe key 环境变量均未配置。该复核仅记录计数和存在性，不落盘 token、账号或响应体。
 - 2026-08-09 外部交付复测：GitHub API 返回上游 `pull=true`、`push=false`，上游 push dry-run 返回 HTTP 403；Chrome/Firefox 商店发布凭据环境变量均未注入。分支已保持同步 fork，上游与商店交付继续保留为外部输入任务。
 - 2026-08-09 EF-26 扩展检索：三个工作树及对应全局技能缓存共扫描 2,842 个 JSON，57 个相关 JSON 全部可解析，最大逐次数组 12 条；29 个 CSV/JSONL/NDJSON 无观测导出。Git 全引用、提交路径和 44 个不可达对象也未找到 729 条原始记录，历史结论继续保持“外部汇总待复算”。
@@ -25,10 +25,10 @@
 | 浏览器身份 | 3 个本机 Chrome Cookie 候选：headless 直连/SG 均 HTTP 403；headed 直连/SG 均 HTTP 200，但账号与 access token 均不存在 | 阻塞资格 |
 | 资格执行器 | `live-eligibility-mullvad.py` 因未找到有效 session 进入 fail-closed | 未运行资格单元 |
 | Saved Payment preflight | 扩展、Playwright、浏览器通过；profile、支付输入、后端均缺失 | 阻塞支付写入 |
-| 多支付方式提链 | 本地方法候选、严格资格保持、终链白名单与不重放门已通过 147/147 回归；live 计划必须显式配置国家、至少两种受支持方式和 `hosted/custom/both` UI 模式 | 本地完成、live 待输入 |
+| 多支付方式提链 | 本地方法候选、严格资格保持、终链白名单与不重放门已通过 163/163 回归；live 计划必须显式配置国家、至少两种受支持方式和 `hosted/custom/both` UI 模式 | 本地完成、live 待输入 |
 | Live 探测计划 | 同轮显式配置 JP/SG/US、hosted+paypal、both UI，计划门通过 | 单轮通过，待与身份/支付输入合并运行 |
 
-统一审计命令：`pnpm audit:live`；严格入口：`pnpm audit:live:strict`；单元门：`pnpm test:live-readiness`（10/10）。当前证据写入 `.context-snapshots/live-readiness/latest.json`，最多 100 条脱敏历史写入 `.context-snapshots/live-readiness/history.jsonl`；稳定门要求最近 3 次窗口内至少连续 2 次目标域成功。严格入口同时要求稳定性、身份、三阶段互异出口、Saved Payment preflight 和显式多国家/多方式计划，任一门不足即返回非零。
+统一审计命令：`pnpm audit:live`；严格入口：`pnpm audit:live:strict`；单元门：`pnpm test:live-readiness`（13/13）。当前证据写入 `.context-snapshots/live-readiness/latest.json`，最多 100 条脱敏历史写入 `.context-snapshots/live-readiness/history.jsonl`；稳定门要求最近 3 次窗口内至少连续 2 次目标域成功。身份门只接受 `/backend-api/me` 的服务端 2xx，不接受仅本地 JWT 结构或 `exp` 未过期；严格入口同时要求稳定性、身份、三阶段互异出口、Saved Payment preflight 和显式多国家/多方式计划，任一门不足即返回非零。
 
 ## 领域状态
 

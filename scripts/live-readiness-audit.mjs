@@ -14,6 +14,7 @@ const TRACE_TARGETS = {
   cloudflare: 'https://www.cloudflare.com/cdn-cgi/trace',
   chatgpt: 'https://chatgpt.com/cdn-cgi/trace',
 };
+const IDENTITY_TARGET = 'https://chatgpt.com/backend-api/me';
 const DEFAULT_PROXY = 'socks5h://127.0.0.1:10808';
 const LIVE_STAGES = ['auth', 'checkout', 'billing'];
 const LIVE_PAYMENT_METHODS = new Set(['hosted', 'paypal', 'momo', 'gopay', 'ideal', 'upi', 'pix', 'blik', 'twint', 'kakao']);
@@ -76,6 +77,48 @@ export function publicTrace(trace) {
     country: String(trace?.country || ''),
     colo: String(trace?.colo || ''),
   };
+}
+
+export async function validateIdentityToken(value, options = {}) {
+  const now = Number(options.now ?? Math.floor(Date.now() / 1000));
+  const inspected = inspectJwt(value, now);
+  const base = {
+    present: inspected.present,
+    shapeValid: inspected.shapeValid,
+    expired: inspected.expired,
+    locallyValid: inspected.valid,
+    serverAttempted: false,
+    serverAccepted: false,
+    status: inspected.expired ? 'expired' : 'invalid',
+    httpStatus: 0,
+    valid: false,
+  };
+  if (!inspected.valid) return base;
+
+  const request = options.request || globalThis.fetch;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15_000));
+  try {
+    const response = await request(IDENTITY_TARGET, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${String(value).trim()}`, Accept: 'application/json' },
+      cache: 'no-store',
+      credentials: 'omit',
+      redirect: 'error',
+      signal: controller.signal,
+    });
+    const httpStatus = Number(response?.status || 0);
+    const serverAccepted = Boolean(response?.ok && httpStatus >= 200 && httpStatus < 300);
+    const status = serverAccepted
+      ? 'accepted'
+      : [401, 403].includes(httpStatus) ? 'rejected' : 'unaccepted';
+    await Promise.resolve(response?.body?.cancel?.()).catch(() => {});
+    return { ...base, serverAttempted: true, serverAccepted, status, httpStatus, valid: serverAccepted };
+  } catch {
+    return { ...base, serverAttempted: true, status: 'unreachable' };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function liveTargetIp(observation) {
@@ -172,7 +215,7 @@ export function publicHistoryEntry(report) {
 
 function buildReadinessGates(input, traces, stageEgress, uniqueEgressCount) {
   const targetReachable = traces.some((item) => item.target === 'chatgpt' && item.trace.ok);
-  const identityReady = Boolean(input.token?.valid || Number(input.sessions?.valid || 0) > 0);
+  const identityReady = Boolean(input.token?.serverAccepted || Number(input.sessions?.valid || 0) > 0);
   const gates = {
     targetReachable,
     targetStabilityReady: Boolean(input.targetStability?.ready),
@@ -200,8 +243,15 @@ function blockedReasonsFor(gates) {
 function publicIdentity(input) {
   return {
     tokenConfigured: Boolean(input.token?.present),
-    tokenValid: Boolean(input.token?.valid),
+    tokenShapeValid: Boolean(input.token?.shapeValid),
+    tokenServerAttempted: Boolean(input.token?.serverAttempted),
+    tokenServerAccepted: Boolean(input.token?.serverAccepted),
+    tokenStatus: String(input.token?.status || 'invalid'),
+    tokenHttpStatus: Number(input.token?.httpStatus || 0),
+    tokenValid: Boolean(input.token?.serverAccepted),
     sessionFiles: Number(input.sessions?.files || 0),
+    sessionCandidates: Number(input.sessions?.candidates || 0),
+    checkedSessions: Number(input.sessions?.checked || 0),
     validSessions: Number(input.sessions?.valid || 0),
   };
 }
@@ -262,15 +312,33 @@ async function writeLiveEvidence(evidenceDir, report, previousEntries) {
   await writeFile(path.join(evidenceDir, 'history.jsonl'), `${entries.map((item) => JSON.stringify(item)).join('\n')}\n`, 'utf8');
 }
 
-async function inspectSessions(directory, now = Math.floor(Date.now() / 1000)) {
-  const result = { configured: Boolean(directory), exists: Boolean(directory && existsSync(directory)), files: 0, valid: 0, invalid: 0 };
+export async function inspectSessions(directory, options = {}) {
+  const now = Number(options.now ?? Math.floor(Date.now() / 1000));
+  const validateToken = options.validateToken || ((token) => validateIdentityToken(token, { now }));
+  const result = {
+    configured: Boolean(directory),
+    exists: Boolean(directory && existsSync(directory)),
+    files: 0,
+    candidates: 0,
+    checked: 0,
+    valid: 0,
+    invalid: 0,
+  };
   if (!result.exists) return result;
   for (const name of await readdir(directory)) {
     if (!name.toLowerCase().endsWith('.json')) continue;
     result.files += 1;
     try {
       const item = JSON.parse(await readFile(path.join(directory, name), 'utf8'));
-      if (inspectJwt(item.access_token, now).valid) result.valid += 1;
+      const candidate = inspectJwt(item.access_token, now);
+      if (!candidate.valid) {
+        result.invalid += 1;
+        continue;
+      }
+      result.candidates += 1;
+      const validation = await validateToken(item.access_token);
+      if (validation.serverAttempted) result.checked += 1;
+      if (validation.serverAccepted) result.valid += 1;
       else result.invalid += 1;
     } catch {
       result.invalid += 1;
@@ -320,7 +388,7 @@ async function canListen(port, host = '127.0.0.1') {
 async function main() {
   const env = process.env;
   const sessionsDir = env.OPX_LIVE_SESSIONS_DIR || path.join(ROOT, '.context-snapshots', 'live-accounts');
-  const token = inspectJwt(env.OPX_LIVE_TOKEN);
+  const token = await validateIdentityToken(env.OPX_LIVE_TOKEN);
   const sessions = await inspectSessions(sessionsDir);
   const runtime = createSavedPaymentLiveE2eRuntime({ repoRoot: ROOT, env });
   const frontProxy = env.OPX_LIVE_FRONT_PROXY || DEFAULT_PROXY;
