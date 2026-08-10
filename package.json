@@ -35,6 +35,7 @@
     "test:e2e-plus-closure:seal": "tsx scripts/e2e-plus-checkout-closure-live.ts --seal-existing",
     "test:live-readiness": "node --test tests/live-readiness-audit.test.mjs",
     "audit:live": "node scripts/live-readiness-audit.mjs",
+    "audit:live:strict": "node scripts/live-readiness-audit.mjs --strict",
     "postinstall": "wxt prepare"
   },
   "devDependencies": {

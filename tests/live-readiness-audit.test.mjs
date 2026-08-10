@@ -5,11 +5,13 @@ import {
   buildReadinessReport,
   buildStageEgressSummary,
   containsSensitiveShapes,
+  evaluateTargetStability,
   inspectJwt,
   parseLiveProbePlan,
   parseProxyDescriptor,
   parseTraceOutput,
   publicPaymentPreflight,
+  publicHistoryEntry,
   publicTrace,
 } from '../scripts/live-readiness-audit.mjs';
 
@@ -42,12 +44,13 @@ test('full readiness requires identity, three egresses, target reachability and 
     target: 'chatgpt', plane: 'stage', stage: ['auth', 'checkout', 'billing'][index], proxy: { configured: true, accepted: true },
     trace: { ok: true, httpStatus: 200, country: 'SG', colo: 'SIN', ip },
   }));
-  const ready = buildReadinessReport({ token: { valid: true, present: true }, sessions: {}, payment: { ok: true }, probePlan: { ready: true }, traces });
+  const ready = buildReadinessReport({ token: { valid: true, present: true }, sessions: {}, payment: { ok: true }, probePlan: { ready: true }, targetStability: { ready: true }, traces });
   assert.equal(ready.gates.fullLiveReady, true);
   const blocked = buildReadinessReport({ token: { valid: false }, sessions: { valid: 0 }, payment: { ok: false }, traces: traces.slice(0, 1) });
   assert.equal(blocked.gates.fullLiveReady, false);
   assert.deepEqual(blocked.blockedReasons, [
     'identity-missing',
+    'target-stability-missing',
     'fewer-than-three-unique-egresses',
     'multi-stage-egress-missing',
     'saved-payment-preflight',
@@ -95,6 +98,27 @@ test('saved payment runtime readiness is projected into the public payment gate'
     ok: true,
     profileExists: true,
   });
+});
+
+test('target stability requires two consecutive successes within a bounded window', () => {
+  assert.equal(evaluateTargetStability([], true).ready, false);
+  assert.equal(evaluateTargetStability([{ targetReachable: true }], true).ready, true);
+  const unstable = evaluateTargetStability([{ targetReachable: true }, { targetReachable: false }], true);
+  assert.equal(unstable.ready, false);
+  assert.equal(unstable.sampleCount, 3);
+});
+
+test('history entries keep only sanitized readiness fields', () => {
+  const entry = publicHistoryEntry({
+    generatedAt: '2026-08-09T00:00:00.000Z',
+    gates: { targetReachable: true, fullLiveReady: false },
+    egress: { uniqueEgressCount: 1, stageEgress: { uniqueEgressCount: 0 } },
+    blockedReasons: ['identity-missing'],
+    token: 'eyJabc.def.ghi',
+  });
+  assert.equal(entry.targetReachable, true);
+  assert.equal(containsSensitiveShapes(entry), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(entry, 'token'), false);
 });
 
 test('readiness evidence rejects sensitive shapes', () => {

@@ -82,17 +82,10 @@ test('QR-13 unchecked verification items are limited to declared external gates'
 });
 
 test('QR-13 root index names every Saved Payment live preflight input', () => {
-  const requiredInputs = [
-    'SPM_E2E_PROFILE_DIR',
-    'SPM_E2E_PUBLISHABLE_KEY',
-    'SPM_E2E_BILLING_NAME',
-    'SPM_E2E_CARD_NUMBER',
-    'SPM_E2E_CARD_EXPIRY',
-    'SPM_E2E_CARD_CVC',
-    'SPM_E2E_BACKEND_BASE_URL',
-    'SPM_E2E_STRIPE_SECRET_KEY',
-  ];
-  for (const input of requiredInputs) assert.match(rootIndex, new RegExp(`\\b${input}\\b`));
+  assert.match(
+    rootIndex,
+    /SPM_E2E_PROFILE_DIR[\s\S]*SPM_E2E_PUBLISHABLE_KEY[\s\S]*SPM_E2E_BILLING_NAME[\s\S]*SPM_E2E_CARD_NUMBER[\s\S]*SPM_E2E_CARD_EXPIRY[\s\S]*SPM_E2E_CARD_CVC[\s\S]*SPM_E2E_BACKEND_BASE_URL[\s\S]*SPM_E2E_STRIPE_SECRET_KEY/,
+  );
 });
 
 test('QR-15 current external-gate evidence is dated and fail-closed', () => {
@@ -119,13 +112,12 @@ test('QR-16 and QR-17 structural baseline contract is consistent and executable'
   assert.doesNotMatch(rootIndex, /完整 184 文件迁移仍需/);
 });
 
-test('QR-19 live stage and multi-method plan contract is explicit', () => {
-  for (const name of ['OPX_LIVE_AUTH_PROXY', 'OPX_LIVE_CHECKOUT_PROXY', 'OPX_LIVE_BILLING_PROXY']) {
-    assert.match(rootIndex, new RegExp(`\\b${name}\\b`));
-  }
-  for (const name of ['OPX_LIVE_COUNTRIES', 'OPX_LIVE_PAYMENT_METHODS', 'OPX_LIVE_CHECKOUT_UI_MODE']) {
-    assert.match(rootIndex, new RegExp(`\\b${name}\\b`));
-  }
+test('QR-19/QR-20 live stage, plan and stability contracts are explicit', () => {
+  assert.match(rootIndex, /OPX_LIVE_AUTH_PROXY[\s\S]*OPX_LIVE_CHECKOUT_PROXY[\s\S]*OPX_LIVE_BILLING_PROXY/);
+  assert.match(rootIndex, /OPX_LIVE_COUNTRIES[\s\S]*OPX_LIVE_PAYMENT_METHODS[\s\S]*OPX_LIVE_CHECKOUT_UI_MODE/);
   assert.match(qualityRemediationTasks, /QR-19.*三阶段出口与多方式 live 计划门/);
-  assert.match(qualityRemediationVerify, /Live readiness 单元.*8\/8/);
+  assert.match(qualityRemediationTasks, /QR-20.*目标域稳定性历史门/);
+  assert.match(rootIndex, /history\.jsonl.*最近 3 次窗口内至少连续 2 次/s);
+  assert.match(rootIndex, /audit:live:strict/);
+  assert.match(qualityRemediationVerify, /Live readiness 单元.*10\/10/);
 });

@@ -4,8 +4,9 @@
 | --- | --- | --- |
 | TypeScript | `pnpm compile` | PASS，0 error |
 | 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，147/147 |
-| Live readiness 单元 | `pnpm test:live-readiness` | PASS，8/8；只统计成功 ChatGPT trace，三阶段必须互异，多方式计划和 Saved Payment 总门均有反例覆盖 |
-| Live readiness 当前审计 | `pnpm audit:live` | PASS（审计完成）；`targetReachable=true`、`uniqueEgressCount=1`，身份、三阶段出口、支付和多方式计划均为 false，`fullLiveReady=false`，证据脱敏 |
+| Live readiness 单元 | `pnpm test:live-readiness` | PASS，10/10；只统计成功 ChatGPT trace，三阶段必须互异，多方式计划、Saved Payment 总门、连续稳定窗口和历史脱敏均有反例覆盖 |
+| Live readiness 当前审计 | 连续两次 `pnpm audit:live`，2026-08-10 再次复测 | PASS（审计完成）；首轮 `targetStabilityReady=false`，第二轮达到连续 2 次成功并转为 true；最新窗口连续成功 3 次，`uniqueEgressCount=1`，身份、三阶段出口、支付和多方式计划均为 false，`fullLiveReady=false` |
+| Live readiness 严格阻断 | `node scripts/live-readiness-audit.mjs --strict` | PASS（预期阻断），脚本原始退出码 2；稳定门已通过，仍明确阻断身份、出口多样性、三阶段出口、Saved Payment 与 probe plan |
 | Saved Payment 后端 | `pnpm test:saved-payment-backend` | PASS，3/3 |
 | 因素分析 | `node tools/_eligibility_analysis_smoke.mjs` | PASS |
 | 平衡排程 | `node tools/_eligibility_experiment_smoke.mjs` | PASS |
@@ -29,7 +30,7 @@
 | QR-12 主流程终态 | `pnpm test:e2e-terminal-boundary` | PASS；失效 Auth 出口在 `cleanup-environment` 形成结构化失败终态，约 8 秒返回，`fullAutomationReachedTerminal=true`，不再额外等待里程碑超时 |
 | QR-12 Saved Payment UI | `node scripts/e2e-saved-payment-ui.mjs` | PASS；420px/360px 无溢出、越界和标签裁切；真实 Session 401/403 单列为 `identityGate`，非身份错误仍阻断 |
 | QR-12 源码契约 | `pnpm tsx --test tests/qr10-structure.test.ts` | PASS，5/5；终态短路、本轮证据、身份状态精确匹配和截图基线路径均有邻近回归断言 |
-| QR-13/QR-15/QR-16/QR-17 SSOT 一致性 | `pnpm test:ssot` | PASS，6/6；领域三件套、非完成任务根汇总、未勾选外部门、live 输入完整性、当前证据时效、结构基线与可执行命令均通过 |
+| QR-13/QR-15/QR-16/QR-17/QR-19/QR-20 SSOT 一致性 | `pnpm test:ssot` | PASS，7/7；领域三件套、非完成任务根汇总、未勾选外部门、live 输入完整性、当前证据时效、结构基线、稳定历史门与可执行命令均通过 |
 | QR-14 harness 拆分 | `pnpm test:e2e-terminal-boundary` + `pnpm tsx --test tests/qr10-structure.test.ts` | PASS；失败编排位于 `tests/support`，生产 E2E 入口不再包含子进程 harness，六项终态边界断言保持通过 |
 | QR-15 外部门实测 | `pnpm test:e2e-saved-payment:check` + 临时隔离 profile 直连/SG 复测 + GitHub GraphQL/REST PR 创建 | PASS（边界判定）；默认 profile/支付输入/测试后端缺失，历史 profile 副本两条路径的 Session 均为 403 且无账号/AT，当前 `gh pr create` 再次为 GraphQL 403，未形成 live 支付或上游交付结论 |
 | QR-16 formatter 回归 | `pnpm tsx --test tests/runner-format.test.ts` | PASS，3/3；全部字段顺序和文案、falsy 字段、非对象输入保持兼容 |

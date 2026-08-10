@@ -83,3 +83,9 @@
 - `pnpm audit:live` 分别验证 Auth、Checkout、Billing 的显式代理，只接受成功访问 ChatGPT 且实际出口三段互异的配置；通用代理数量不再替代阶段真实性。
 - 多方式计划必须显式给出国家、至少两种受支持支付方式和 `hosted/custom/both` UI 模式；无配置、无效方式或单方式计划均保持 fail-closed。
 - Saved Payment 使用运行时 `preflightOk` 进入统一支付门，公开证据只保留布尔状态、缺失变量名和脱敏网络摘要。
+
+## 2026-08-09 QR-20 目标域稳定性历史门
+
+- 单次 ChatGPT trace 成功只证明瞬时可达；统一审计现在要求最近 3 次窗口内至少连续 2 次成功，才将 `targetStabilityReady` 判为 true。
+- `.context-snapshots/live-readiness/history.jsonl` 最多保留 100 条，仅包含时间、门状态、出口计数和阻断原因；账号、Token、Cookie、代理凭据、完整卡数据与公网 IP 均不写入历史。
+- `pnpm audit:live:strict` 固定严格入口；当前连续探测已通过目标域稳定门，但身份、出口多样性、三阶段出口、Saved Payment 和计划输入仍按缺口 fail-closed。

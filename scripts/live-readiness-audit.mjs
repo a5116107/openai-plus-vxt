@@ -133,11 +133,49 @@ export function publicPaymentPreflight(runtime) {
   return { ok: Boolean(runtime?.preflightOk), ...(runtime?.preflight || {}) };
 }
 
+export function evaluateTargetStability(previousEntries, currentReachable) {
+  if (!Array.isArray(previousEntries)) throw new TypeError('target stability history must be an array');
+  const samples = [...previousEntries.map((item) => Boolean(item?.targetReachable)), Boolean(currentReachable)].slice(-3);
+  let trailingSuccesses = 0;
+  for (const reachable of [...samples].reverse()) {
+    if (!reachable) break;
+    trailingSuccesses += 1;
+  }
+  return {
+    ready: trailingSuccesses >= 2,
+    sampleCount: samples.length,
+    successCount: samples.filter(Boolean).length,
+    trailingSuccesses,
+    requiredTrailingSuccesses: 2,
+    windowSize: 3,
+  };
+}
+
+export function publicHistoryEntry(report) {
+  if (!report || typeof report !== 'object' || !report.gates || !report.egress || !Array.isArray(report.blockedReasons)) {
+    throw new TypeError('readiness report shape is incomplete');
+  }
+  return {
+    generatedAt: report.generatedAt,
+    targetReachable: Boolean(report.gates?.targetReachable),
+    targetStabilityReady: Boolean(report.gates?.targetStabilityReady),
+    identityReady: Boolean(report.gates?.identityReady),
+    multiStageEgressReady: Boolean(report.gates?.multiStageEgressReady),
+    paymentReady: Boolean(report.gates?.paymentReady),
+    probePlanReady: Boolean(report.gates?.probePlanReady),
+    fullLiveReady: Boolean(report.gates?.fullLiveReady),
+    uniqueEgressCount: Number(report.egress.uniqueEgressCount),
+    stageUniqueEgressCount: Number(report.egress.stageEgress?.uniqueEgressCount),
+    blockedReasons: report.blockedReasons,
+  };
+}
+
 function buildReadinessGates(input, traces, stageEgress, uniqueEgressCount) {
   const targetReachable = traces.some((item) => item.target === 'chatgpt' && item.trace.ok);
   const identityReady = Boolean(input.token?.valid || Number(input.sessions?.valid || 0) > 0);
   const gates = {
     targetReachable,
+    targetStabilityReady: Boolean(input.targetStability?.ready),
     identityReady,
     exitDiversityReady: uniqueEgressCount >= 3,
     multiStageEgressReady: stageEgress.ready,
@@ -151,6 +189,7 @@ function blockedReasonsFor(gates) {
   return [
     ['targetReachable', 'target-unreachable'],
     ['identityReady', 'identity-missing'],
+    ['targetStabilityReady', 'target-stability-missing'],
     ['exitDiversityReady', 'fewer-than-three-unique-egresses'],
     ['multiStageEgressReady', 'multi-stage-egress-missing'],
     ['paymentReady', 'saved-payment-preflight'],
@@ -189,6 +228,7 @@ export function buildReadinessReport(input) {
     generatedAt: input.generatedAt || new Date().toISOString(),
     gates,
     identity: publicIdentity(input),
+    stability: input.targetStability,
     egress: {
       uniqueEgressCount,
       stageEgress,
@@ -203,6 +243,23 @@ export function buildReadinessReport(input) {
 export function containsSensitiveShapes(value) {
   const text = JSON.stringify(value);
   return /(?:eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]{12,}|(?:authorization|cookie)\s*[:=]|\b\d{12,19}\b)/i.test(text);
+}
+
+async function readLiveHistory(historyPath) {
+  if (!existsSync(historyPath)) return [];
+  const lines = (await readFile(historyPath, 'utf8')).split(/\r?\n/).filter(Boolean).slice(-99);
+  const entries = lines.map((line) => JSON.parse(line));
+  if (entries.some((item) => !item || typeof item !== 'object' || Array.isArray(item))) {
+    throw new TypeError('live readiness history contains a non-object entry');
+  }
+  return entries;
+}
+
+async function writeLiveEvidence(evidenceDir, report, previousEntries) {
+  const entries = [...previousEntries, publicHistoryEntry(report)].slice(-100);
+  await mkdir(evidenceDir, { recursive: true });
+  await writeFile(path.join(evidenceDir, 'latest.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  await writeFile(path.join(evidenceDir, 'history.jsonl'), `${entries.map((item) => JSON.stringify(item)).join('\n')}\n`, 'utf8');
 }
 
 async function inspectSessions(directory, now = Math.floor(Date.now() / 1000)) {
@@ -280,11 +337,15 @@ async function main() {
   }
   const ports = {};
   for (const port of [10808, 7890, 18090]) ports[String(port)] = await canListen(port);
+  const evidenceDir = path.join(ROOT, '.context-snapshots', 'live-readiness');
+  const previousEntries = await readLiveHistory(path.join(evidenceDir, 'history.jsonl'));
+  const targetReachable = traces.some((item) => item.target === 'chatgpt' && item.trace.ok);
   const report = buildReadinessReport({
     token,
     sessions,
     payment: publicPaymentPreflight(runtime),
     probePlan: parseLiveProbePlan(env),
+    targetStability: evaluateTargetStability(previousEntries, targetReachable),
     traces,
     generatedAt: new Date().toISOString(),
   });
@@ -294,9 +355,7 @@ async function main() {
     ports,
   };
   report.sanitized = !containsSensitiveShapes(report);
-  const evidenceDir = path.join(ROOT, '.context-snapshots', 'live-readiness');
-  await mkdir(evidenceDir, { recursive: true });
-  await writeFile(path.join(evidenceDir, 'latest.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  await writeLiveEvidence(evidenceDir, report, previousEntries);
   process.stdout.write(`${JSON.stringify({ ...report, evidence: '.context-snapshots/live-readiness/latest.json' }, null, 2)}\n`);
   if (process.argv.includes('--strict') && !report.gates.fullLiveReady) process.exitCode = 2;
 }
