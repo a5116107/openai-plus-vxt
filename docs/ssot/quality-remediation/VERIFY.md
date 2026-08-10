@@ -3,10 +3,11 @@
 | 验证项 | 命令 | 当前结果 |
 | --- | --- | --- |
 | TypeScript | `pnpm compile` | PASS，0 error |
-| 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，147/147 |
+| 全量测试 | `pnpm exec tsx --test <tests 下全部 *.test.ts 与 *.test.mjs>` | PASS，160/160 |
 | Live readiness 单元 | `pnpm test:live-readiness` | PASS，10/10；只统计成功 ChatGPT trace，三阶段必须互异，多方式计划、Saved Payment 总门、连续稳定窗口和历史脱敏均有反例覆盖 |
-| Live readiness 当前审计 | `node scripts/live-readiness-audit.mjs`，2026-08-10 09:41 UTC 第 12 次观测 | PASS（审计完成）；72 节点中 55 个成功、27 个不同出口；Auth=JP、Checkout=SG、Billing=US，`targetStabilityReady`、`exitDiversityReady`、`multiStageEgressReady`、`probePlanReady` 均为 true，仅身份与支付为 false，`fullLiveReady=false` |
+| Live readiness 当前审计 | `node scripts/live-readiness-audit.mjs`，2026-08-10 10:52 UTC 第 14 次观测 | PASS（审计完成）；72 节点中 55 个成功、27 个不同出口；latest 总出口数为 4，Auth=JP、Checkout=SG、Billing=US，`targetStabilityReady`、`exitDiversityReady`、`multiStageEgressReady`、`probePlanReady` 均为 true，仅身份与支付为 false，`fullLiveReady=false` |
 | Live readiness 严格阻断 | `node scripts/live-readiness-audit.mjs --strict` | PASS（预期阻断），退出码 2；多出口、三阶段与计划门已通过，阻断原因精确为 `identity-missing`、`saved-payment-preflight` |
+| 身份与支付输入复核 | 浏览器会话存储 JWT 归属筛选；live/支付环境变量存在性检查 | PASS（脱敏调查完成）；8 个未过期 JWT 中 OpenAI/ChatGPT 候选为 0，`/backend-api/me` 候选请求数为 0；live 身份与 Saved Payment 必需变量均未配置，未记录任何值 |
 | Saved Payment 后端 | `pnpm test:saved-payment-backend` | PASS，3/3 |
 | 因素分析 | `node tools/_eligibility_analysis_smoke.mjs` | PASS |
 | 平衡排程 | `node tools/_eligibility_experiment_smoke.mjs` | PASS |
