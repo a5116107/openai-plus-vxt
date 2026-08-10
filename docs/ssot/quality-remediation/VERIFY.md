@@ -5,7 +5,7 @@
 | TypeScript | `pnpm compile` | PASS，0 error |
 | 全量测试 | `pnpm tsx --test tests/*.test.ts` | PASS，147/147 |
 | Live readiness 单元 | `pnpm test:live-readiness` | PASS，10/10；只统计成功 ChatGPT trace，三阶段必须互异，多方式计划、Saved Payment 总门、连续稳定窗口和历史脱敏均有反例覆盖 |
-| Live readiness 当前审计 | 连续两次 `pnpm audit:live`，2026-08-10 01:58 UTC 再次复测 | PASS（审计完成）；首轮 `targetStabilityReady=false`，第二轮达到连续 2 次成功并转为 true；2026-08-10 复核窗口连续成功 3 次、稳定门为 true，`uniqueEgressCount=1–2`（直连与 10808 出口 IP 偶发相同/不同），身份、三阶段出口、支付和多方式计划均为 false，`fullLiveReady=false` |
+| Live readiness 当前审计 | `pnpm audit:live`，2026-08-10 06:54 UTC 第 10 次观测 | PASS（审计完成）；最近 3 次窗口连续成功 3 次、`targetStabilityReady=true`，当前直连与 10808 均为 TW/TPE、`uniqueEgressCount=1`；身份、三阶段出口、支付和多方式计划均为 false，`fullLiveReady=false`；10 条历史及 latest 敏感形状扫描均为 0 |
 | Live readiness 严格阻断 | `node scripts/live-readiness-audit.mjs --strict` | PASS（预期阻断），脚本原始退出码 2；稳定门已通过，仍明确阻断身份、出口多样性、三阶段出口、Saved Payment 与 probe plan |
 | Saved Payment 后端 | `pnpm test:saved-payment-backend` | PASS，3/3 |
 | 因素分析 | `node tools/_eligibility_analysis_smoke.mjs` | PASS |
