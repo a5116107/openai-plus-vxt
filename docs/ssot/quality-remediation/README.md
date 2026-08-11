@@ -18,7 +18,7 @@
 - skills consistency、stack-run、quality-guard 必须保留命令输出；本地 bootstrap 代理使用 Git 本地排除清单，不进入产品提交。
 - 本地交付验证使用 `--no-chain` 停在 verify，避免把未请求的 GitHub 同步和部署事务作为 XPI 验收前置条件。
 - 0.0.37 Chrome ZIP 与 Firefox XPI 已发布到 fork 预发布，并记录 SHA-256 与回滚说明。
-- 当前结构事实由显式全仓扫描维护：169 个文件、91 个 finding（84 advisory、7 baseline）、0 blocker；旧版“184 文件迁移”仅是历史分支差异规模，不再充当当前任务清单或验收口径。
+- 当前结构事实由显式全仓扫描维护：170 个文件、91 个 finding（84 advisory、7 baseline）、0 blocker；旧版“184 文件迁移”仅是历史分支差异规模，不再充当当前任务清单或验收口径。
 
 ## 2026-07-29 全流程回归补充
 
@@ -68,14 +68,14 @@
 
 ## 2026-08-09 QR-16 显式结构基线
 
-- 严格结构扫描通过 `git ls-files` 显式覆盖 `src/`、`entrypoints/`、`scripts/` 与 `tests/support/` 的 169 个源码文件，结果为 91 个 finding（84 advisory、7 baseline）、0 blocker。
+- 严格结构扫描通过 `git ls-files` 显式覆盖 `src/`、`entrypoints/`、`scripts/` 与 `tests/support/` 的 170 个源码文件，结果为 91 个 finding（84 advisory、7 baseline）、0 blocker。
 - `summarizeActionData` 按页面、支付控件、输入发现、输入写入、输入状态和按钮提示拆分，最大复杂度从 65 降至严格门阈值以内，`runner-format.ts` 聚焦扫描为 0 finding。
 - 3 项聚焦回归锁定全部字段顺序、中文文案、falsy 字段和非对象输入语义；旧版 184 文件分支差异不再写作当前可执行任务数量。
 
 ## 2026-08-09 QR-17 可执行结构回退门
 
 - `pnpm test:structural-baseline` 从 Git 跟踪文件实时生成严格扫描范围，不依赖手写文件列表或聊天中的历史数字。
-- 运行门要求覆盖文件保持 169、总 finding 不超过 91、advisory 不超过 84、baseline 不超过 7、blocker 为 0，且 `runner-format.ts` 不重新出现告警。
+- 运行门要求覆盖文件保持 170、总 finding 不超过 91、advisory 不超过 84、baseline 不超过 7、blocker 为 0，且 `runner-format.ts` 不重新出现告警。
 - 结构债务下降会直接通过；覆盖变化或 finding 增长必须先解释并显式更新 SSOT，避免无声漂移。
 
 ## 2026-08-09 QR-19 Live 分阶段与多方式计划门

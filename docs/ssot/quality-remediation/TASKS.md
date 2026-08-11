@@ -17,8 +17,8 @@
 | QR-13 | SSOT 全域一致性门 | 完成（本地范围） | 自动检查领域三件套、非完成任务根索引覆盖、未勾选验收白名单和 Saved Payment live 输入完整性 |
 | QR-14 | E2E 失败 harness 职责拆分 | 完成（本地范围） | 确定性失败编排迁至 `tests/support`；生产入口只保留运行逻辑和终态识别，命令契约不变 |
 | QR-15 | 外部门证据时效收口 | 完成（本地范围） | 历史 live profile 证据显式标注日期；当前 preflight、profile probe 与上游 PR 403 结果独立记录并由 SSOT 测试锁定 |
-| QR-16 | 显式全仓结构基线与低风险复杂度收敛 | 完成（本地范围） | 169 文件严格扫描为 91 finding / 0 blocker；`runner-format.ts` 聚焦扫描 0 finding，3 项兼容回归通过；旧 184 文件差异不再作为任务代理 |
-| QR-17 | 将全仓结构基线转成自动回退门 | 完成（本地范围） | `pnpm test:structural-baseline` 从 Git 文件范围复算 169/91/84/7/0 上限并阻止 `runner-format` 告警回归 |
+| QR-16 | 显式全仓结构基线与低风险复杂度收敛 | 完成（本地范围） | 170 文件严格扫描为 91 finding / 0 blocker；`runner-format.ts` 聚焦扫描 0 finding，3 项兼容回归通过；旧 184 文件差异不再作为任务代理 |
+| QR-17 | 将全仓结构基线转成自动回退门 | 完成（本地范围） | `pnpm test:structural-baseline` 从 Git 文件范围复算 170/91/84/7/0 上限并阻止 `runner-format` 告警回归 |
 | QR-18 | 统一 live readiness 脱敏审计门 | 完成（本地范围） | `pnpm audit:live` 汇总身份、目标域、出口互异性、Saved Payment preflight 和端口状态；`--strict` 未满足完整 live 条件时 fail-closed |
 | QR-19 | 三阶段出口与多方式 live 计划门 | 完成（本地范围） | Auth/Checkout/Billing 必须显式配置、成功访问 ChatGPT 且出口互异；国家、至少两种支付方式和 Checkout UI 模式必须形成有效计划；Saved Payment `preflightOk` 正确进入总门 |
 | QR-20 | 目标域稳定性历史门 | 完成（本地范围） | 最近 3 次窗口内连续 2 次成功才通过；历史最多 100 条且只保留脱敏门状态；严格入口对其余 live 缺口继续 fail-closed |

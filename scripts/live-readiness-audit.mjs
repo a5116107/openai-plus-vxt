@@ -154,6 +154,29 @@ export function parseLiveProbePlan(env = {}) {
   };
 }
 
+export function buildLiveStageProxyEnvironment(env = {}) {
+  const host = String(env.OPX_LIVE_PROXY_HOST ?? '').trim();
+  const account = String(env.OPX_LIVE_PROXY_ACCOUNT ?? '').trim();
+  const password = String(env.OPX_LIVE_PROXY_PASSWORD ?? '').trim();
+  const countries = uniqueList(env.OPX_LIVE_PROXY_COUNTRIES ?? env.OPX_LIVE_COUNTRIES, (item) => item.toUpperCase())
+    .filter((item) => /^[A-Z]{2}$/.test(item));
+  const sessionIds = uniqueList(env.OPX_LIVE_PROXY_SESSION_IDS, (item) => item);
+  const minutes = boundedInteger(env.OPX_LIVE_PROXY_SESSION_MINUTES, 5, 1, 120);
+  const componentCount = [host, account, password, ...countries.slice(0, 3), ...sessionIds.slice(0, 3)].filter(Boolean).length;
+  const stageUrls = LIVE_STAGES.map((_, index) => {
+    const username = `${account}-region-${countries[index]}-sid-${sessionIds[index]}-t-${minutes}`;
+    return `socks5://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}`;
+  });
+  const generated = {
+    OPX_LIVE_AUTH_PROXY: stageUrls[0],
+    OPX_LIVE_CHECKOUT_PROXY: stageUrls[1],
+    OPX_LIVE_BILLING_PROXY: stageUrls[2],
+    OPX_LIVE_FRONT_PROXY: stageUrls[0],
+    OPX_LIVE_EXIT_PROXIES: `${stageUrls[1]},${stageUrls[2]}`,
+  };
+  return componentCount === 9 ? { ...generated, ...env } : { ...env };
+}
+
 export function buildStageEgressSummary(traces = []) {
   const stages = LIVE_STAGES.map((stage) => {
     const observation = traces.find((item) => item.stage === stage && item.target === 'chatgpt');
@@ -386,7 +409,7 @@ async function canListen(port, host = '127.0.0.1') {
 }
 
 async function main() {
-  const env = process.env;
+  const env = buildLiveStageProxyEnvironment(process.env);
   const sessionsDir = env.OPX_LIVE_SESSIONS_DIR || path.join(ROOT, '.context-snapshots', 'live-accounts');
   const token = await validateIdentityToken(env.OPX_LIVE_TOKEN);
   const sessions = await inspectSessions(sessionsDir);

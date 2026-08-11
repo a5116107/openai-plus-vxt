@@ -3,8 +3,8 @@
 | 验证项 | 命令 | 当前结果 |
 | --- | --- | --- |
 | TypeScript | `pnpm compile` | PASS，0 error |
-| 全量测试 | `pnpm exec tsx --test <tests 下全部 *.test.ts 与 *.test.mjs>` | PASS，166/166 |
-| Live readiness 单元 | `pnpm test:live-readiness` | PASS，13/13；显式 token 与 session 文件都必须通过 `/backend-api/me` 服务端 2xx，三阶段必须互异，多方式计划、Saved Payment 总门、连续稳定窗口和历史脱敏均有反例覆盖 |
+| 全量测试 | `pnpm exec tsx --test <tests 下全部 *.test.ts 与 *.test.mjs>` | PASS，168/168 |
+| Live readiness 单元 | `pnpm test:live-readiness` | PASS，15/15；显式 token 与 session 文件都必须通过 `/backend-api/me` 服务端 2xx，三阶段必须互异，组件化 SOCKS5 构造需完整国家/会话映射，多方式计划、Saved Payment 总门、连续稳定窗口和历史脱敏均有反例覆盖 |
 | Xray live runner | `node --test tests/live-readiness-xray-runner.test.mjs`；`OPX_XRAY_CONFIG_WAIT_SECONDS=1 pnpm audit:live:xray` | PASS，3/3；无配置 smoke 按预期退出 1 并返回 `XRAY_CONFIG_WAIT_TIMEOUT`，子进程已退出且三个端口已释放 |
 | Live readiness 当前审计 | `node scripts/live-readiness-audit.mjs`，2026-08-10 11:25 UTC 第 16 次观测 | PASS（审计完成）；72 节点中 55 个成功、27 个不同出口；latest 总出口数为 4，Auth=JP、Checkout=SG、Billing=US，`targetStabilityReady`、`exitDiversityReady`、`multiStageEgressReady`、`probePlanReady` 均为 true，新服务端身份门与支付为 false，`fullLiveReady=false` |
 | Live readiness 严格阻断 | `node scripts/live-readiness-audit.mjs --strict` | PASS（预期阻断），退出码 2；多出口、三阶段与计划门已通过，阻断原因精确为 `identity-missing`、`saved-payment-preflight` |
@@ -38,11 +38,11 @@
 | QR-15 外部门实测 | `pnpm test:e2e-saved-payment:check` + 临时隔离 profile 直连/SG 复测 + GitHub GraphQL/REST PR 创建 | PASS（边界判定）；默认 profile/支付输入/测试后端缺失，历史 profile 副本两条路径的 Session 均为 403 且无账号/AT，当前 `gh pr create` 再次为 GraphQL 403，未形成 live 支付或上游交付结论 |
 | QR-16 formatter 回归 | `pnpm tsx --test tests/runner-format.test.ts` | PASS，3/3；全部字段顺序和文案、falsy 字段、非对象输入保持兼容 |
 | QR-16 聚焦结构门 | `structural-quality --files src/features/automation/runner-format.ts,tests/runner-format.test.ts --strict` | PASS，0 finding / 0 blocker；原 65 决策点函数已拆分 |
-| QR-16 全仓结构基线 | 显式 `git ls-files` 清单 + `structural-quality --strict` | PASS（基线判定），169 文件、91 finding（84 advisory、7 baseline）、0 blocker；`runner-format.ts` 告警为 0 |
-| QR-17 可执行结构门 | `pnpm test:structural-baseline` | PASS，1/1；Git 派生范围 169 文件，91 finding（84 advisory、7 baseline）、0 blocker，`runner-format.ts` 告警为 0 |
+| QR-16 全仓结构基线 | 显式 `git ls-files` 清单 + `structural-quality --strict` | PASS（基线判定），170 文件、91 finding（84 advisory、7 baseline）、0 blocker；`runner-format.ts` 告警为 0 |
+| QR-17 可执行结构门 | `pnpm test:structural-baseline` | PASS，1/1；Git 派生范围 170 文件，91 finding（84 advisory、7 baseline）、0 blocker，`runner-format.ts` 告警为 0 |
 | 接码超时清理可观测性 | `pnpm compile` + `tests/qr10-structure.test.ts` | PASS；平台取消、本地订单记账和清理失败均保留可观测结果 |
 | 0.0.37 预发布 | `gh release view v0.0.37-ssot.1 --repo a5116107/openai-plus-vxt` | PASS，4 个资产已上传 |
 
 交付 SHA-256：Chrome ZIP `4fa4db10814dd4c8514d2f357311ef100e7a2b3a3af1db31730a671a8fd74693`；Firefox XPI `5739225446632b2e613ea9185216ecdeacb30c551a29456861f6d9a5e946f008`。
 
-结构预算说明：本轮在既有高风险入口拆分、fallback 收敛和 DOM 挂载治理基础上，新增可复跑的 169 文件全仓基线、收敛 `runner-format.ts` 并将基线接入自动测试；其余 91 个 finding 按 84 advisory、7 baseline 登记，不写成零债务或严格全仓无告警。
+结构预算说明：本轮在既有高风险入口拆分、fallback 收敛和 DOM 挂载治理基础上，新增可复跑的 170 文件全仓基线、收敛 `runner-format.ts` 并将基线接入自动测试；其余 91 个 finding 按 84 advisory、7 baseline 登记，不写成零债务或严格全仓无告警。

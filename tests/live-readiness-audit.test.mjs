@@ -7,6 +7,7 @@ import path from 'node:path';
 import {
   buildReadinessReport,
   buildStageEgressSummary,
+  buildLiveStageProxyEnvironment,
   containsSensitiveShapes,
   evaluateTargetStability,
   inspectSessions,
@@ -174,6 +175,43 @@ test('live probe plan requires explicit countries, two supported methods and UI 
   assert.equal(plan.invalidPaymentMethodCount, 1);
   assert.equal(plan.sampleCount, 20);
   assert.equal(JSON.stringify(plan).includes('unknown'), false);
+});
+
+test('stage proxy component input constructs distinct SOCKS5 stage URLs without overriding explicit URLs', () => {
+  const resolved = buildLiveStageProxyEnvironment({
+    OPX_LIVE_PROXY_HOST: 'proxy.fixture.test:3000',
+    OPX_LIVE_PROXY_ACCOUNT: 'account',
+    OPX_LIVE_PROXY_PASSWORD: 'secret value',
+    OPX_LIVE_PROXY_COUNTRIES: 'jp,sg,de',
+    OPX_LIVE_PROXY_SESSION_IDS: 'auth-id,checkout-id,billing-id',
+    OPX_LIVE_PROXY_SESSION_MINUTES: '5',
+    OPX_LIVE_AUTH_PROXY: 'socks5://explicit.fixture.test:1080',
+  });
+  assert.equal(resolved.OPX_LIVE_AUTH_PROXY, 'socks5://explicit.fixture.test:1080');
+  const checkout = new URL(resolved.OPX_LIVE_CHECKOUT_PROXY);
+  const billing = new URL(resolved.OPX_LIVE_BILLING_PROXY);
+  assert.equal(checkout.protocol, 'socks5:');
+  assert.equal(checkout.host, 'proxy.fixture.test:3000');
+  assert.equal(decodeURIComponent(checkout.username), 'account-region-SG-sid-checkout-id-t-5');
+  assert.equal(decodeURIComponent(checkout.password), 'secret value');
+  assert.equal(decodeURIComponent(billing.username), 'account-region-DE-sid-billing-id-t-5');
+  assert.notEqual(resolved.OPX_LIVE_CHECKOUT_PROXY, resolved.OPX_LIVE_BILLING_PROXY);
+  assert.equal(decodeURIComponent(new URL(resolved.OPX_LIVE_FRONT_PROXY).username), 'account-region-JP-sid-auth-id-t-5');
+  assert.equal(resolved.OPX_LIVE_EXIT_PROXIES, `${resolved.OPX_LIVE_CHECKOUT_PROXY},${resolved.OPX_LIVE_BILLING_PROXY}`);
+});
+
+test('stage proxy component input requires a complete country and session mapping', () => {
+  const input = {
+    OPX_LIVE_PROXY_HOST: 'proxy.fixture.test:3000',
+    OPX_LIVE_PROXY_ACCOUNT: 'account',
+    OPX_LIVE_PROXY_PASSWORD: 'secret',
+    OPX_LIVE_PROXY_COUNTRIES: 'JP,SG',
+    OPX_LIVE_PROXY_SESSION_IDS: 'auth-id,checkout-id,billing-id',
+  };
+  const resolved = buildLiveStageProxyEnvironment(input);
+  assert.equal(resolved.OPX_LIVE_AUTH_PROXY, undefined);
+  assert.equal(resolved.OPX_LIVE_CHECKOUT_PROXY, undefined);
+  assert.equal(resolved.OPX_LIVE_BILLING_PROXY, undefined);
 });
 
 test('saved payment runtime readiness is projected into the public payment gate', () => {

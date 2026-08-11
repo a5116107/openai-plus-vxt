@@ -6,7 +6,7 @@
 
 - 版本：`0.0.37`。
 - 本地实现：试用资格分类、严格晋级、十类支付方式候选与终链、保存支付方式、Plus 双 Checkout、Auth/Checkout/Billing 多阶段出口、恢复不重放、IndexedDB 归档、独立运营页面、隔离上下文调度和脱敏证据均已落地。
-- 本地验证：TypeScript 编译、166/166 项全量测试、13 项 live-readiness 脱敏审计测试、3 项 Xray runner 测试、7 项 SSOT 一致性测试、1 项可执行结构基线、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、Firefox lint 0/0/0、归档运营页 12/12、资格看板全部断言、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
+- 本地验证：TypeScript 编译、168/168 项全量测试、15 项 live-readiness 脱敏审计测试、3 项 Xray runner 测试、7 项 SSOT 一致性测试、1 项可执行结构基线、3 项 Saved Payment 后端测试、Chrome/Firefox 构建、Firefox lint 0/0/0、归档运营页 12/12、资格看板全部断言、自动化零元命中 10/10、自包含三阶段出口 E2E、Plus Closure 浏览器 fixture 和仓库质量复核均通过。
 - 发布：fork 预发布 `v0.0.37-ssot.2`（`b29982b`）已包含本轮 Chrome ZIP、Firefox ZIP、sources ZIP、发布清单和回滚说明；`v0.0.37-ssot.1` 保留为上一基线。
 - 质量策略：功能、安全、工作流和证据门为 PASS；QR-11 已统一 DOM 挂载并将 Firefox lint 清零，QR-12 已分层自动化终态与 live 身份门，QR-13 已建立 SSOT 自动一致性门，QR-14 已将失败终态 harness 从生产 E2E 入口迁至测试 support，QR-15 已分离历史 live 证据与当前外部门状态，QR-16/17 已建立并自动执行全仓结构基线，QR-18/19 已建立统一 live readiness、分阶段出口和多方式计划门，QR-20 已增加目标域连续稳定性历史门；当前变更严格 change/shape gate 为 PASS。
 - 2026-08-10 外部门复测（11:25 UTC，第 16 条脱敏历史）：v2rayN 的 72 节点测试配置中 55 个端口成功访问 ChatGPT trace，按实际出口去重为 27 个，覆盖 JP/SG/US/TW；最新审计选取 JP `10829`、SG `10841`、US `10879` 分别绑定 Auth/Checkout/Billing，三个阶段均为 HTTP 200 且出口互异，总出口数为 4，`exitDiversityReady=true`、`multiStageEgressReady=true`。同轮显式配置 JP/SG/US、hosted+paypal 与 hosted UI 后 `probePlanReady=true`，稳定窗口继续为 3/3；新服务端身份门保持 `identityReady=false`，严格入口按预期退出 2，阻断原因精确为身份与 Saved Payment preflight，`fullLiveReady=false`。16 条历史及 latest 经敏感形状扫描均无 IP、凭据或卡数据，本轮临时 Xray 进程及 `10829`、`10841`、`10879` 监听已全部清理。
@@ -25,10 +25,12 @@
 | 浏览器身份 | 3 个本机 Chrome Cookie 候选：headless 直连/SG 均 HTTP 403；headed 直连/SG 均 HTTP 200，但账号与 access token 均不存在 | 阻塞资格 |
 | 资格执行器 | `live-eligibility-mullvad.py` 因未找到有效 session 进入 fail-closed | 未运行资格单元 |
 | Saved Payment preflight | 扩展、Playwright、浏览器通过；profile、支付输入、后端均缺失 | 阻塞支付写入 |
-| 多支付方式提链 | 本地方法候选、严格资格保持、终链白名单与不重放门已通过 166/166 回归；live 计划必须显式配置国家、至少两种受支持方式和 `hosted/custom/both` UI 模式 | 本地完成、live 待输入 |
+| 多支付方式提链 | 本地方法候选、严格资格保持、终链白名单与不重放门已通过 168/168 回归；live 计划必须显式配置国家、至少两种受支持方式和 `hosted/custom/both` UI 模式 | 本地完成、live 待输入 |
 | Live 探测计划 | 同轮显式配置 JP/SG/US、hosted+paypal、both UI，计划门通过 | 单轮通过，待与身份/支付输入合并运行 |
 
-统一审计命令：`pnpm audit:live`；严格入口：`pnpm audit:live:strict`；单元门：`pnpm test:live-readiness`（13/13）。当前证据写入 `.context-snapshots/live-readiness/latest.json`，最多 100 条脱敏历史写入 `.context-snapshots/live-readiness/history.jsonl`；稳定门要求最近 3 次窗口内至少连续 2 次目标域成功。身份门只接受 `/backend-api/me` 的服务端 2xx，不接受仅本地 JWT 结构或 `exp` 未过期；严格入口同时要求稳定性、身份、三阶段互异出口、Saved Payment preflight 和显式多国家/多方式计划，任一门不足即返回非零。
+统一审计命令：`pnpm audit:live`；严格入口：`pnpm audit:live:strict`；单元门：`pnpm test:live-readiness`（15/15）。当前证据写入 `.context-snapshots/live-readiness/latest.json`，最多 100 条脱敏历史写入 `.context-snapshots/live-readiness/history.jsonl`；稳定门要求最近 3 次窗口内至少连续 2 次目标域成功。身份门只接受 `/backend-api/me` 的服务端 2xx，不接受仅本地 JWT 结构或 `exp` 未过期；严格入口同时要求稳定性、身份、三阶段互异出口、Saved Payment preflight 和显式多国家/多方式计划，任一门不足即返回非零。
+
+SOCKS5 三阶段出口可使用组件环境变量临时构造：`OPX_LIVE_PROXY_HOST`、`OPX_LIVE_PROXY_ACCOUNT`、`OPX_LIVE_PROXY_PASSWORD`、`OPX_LIVE_PROXY_COUNTRIES`（前三个为 Auth/Checkout/Billing 国家）、`OPX_LIVE_PROXY_SESSION_IDS`（三个逗号分隔的会话标识）和可选的 `OPX_LIVE_PROXY_SESSION_MINUTES`。只有三国家与三会话标识均存在时才生成 `socks5://` 阶段 URL；显式 `OPX_LIVE_AUTH_PROXY`、`OPX_LIVE_CHECKOUT_PROXY`、`OPX_LIVE_BILLING_PROXY` 保持优先级。构造值只存在于运行进程，报告、latest 和历史文件仅记录协议、端口、凭据存在性与脱敏 trace 状态。
 
 v2rayN 临时配置由 `pnpm audit:live:xray` 直接消费：先启动该命令等待 `binConfigs/configTest*.json`，再在 v2rayN 触发“测试全部配置”。runner 只校验 Auth/Checkout/Billing 三个端口的 inbound、route 和 outbound 关系，不复制或输出节点配置；随后启动自有 Xray 子进程、依次执行普通与严格审计，并在所有成功/失败路径清理子进程和确认端口释放。显式配置可通过 `OPX_XRAY_CONFIG` 提供，等待时间由 `OPX_XRAY_CONFIG_WAIT_SECONDS` 控制。
 
@@ -67,7 +69,7 @@ v2rayN 临时配置由 `pnpm audit:live:xray` 直接消费：先启动该命令�
 
 ## 当前结构基线
 
-2026-08-09 使用显式文件清单严格扫描 `src/`、`entrypoints/`、`scripts/` 与 `tests/support/`：169 个文件、91 个 finding（84 advisory、7 baseline）、0 blocker。`pnpm test:structural-baseline` 从 `git ls-files` 复算相同范围，阻止文件覆盖漂移、finding 增长、blocker 出现或 `runner-format` 回退。旧版“184 文件迁移”是当时的分支差异规模，不再作为当前任务数量或结构验收口径；其余 finding 是已登记的仓库 advisory，不等同于未完成任务 ID。
+2026-08-11 使用显式文件清单严格扫描 `src/`、`entrypoints/`、`scripts/` 与 `tests/support/`：170 个文件、91 个 finding（84 advisory、7 baseline）、0 blocker。`pnpm test:structural-baseline` 从 `git ls-files` 复算相同范围，阻止文件覆盖漂移、finding 增长、blocker 出现或 `runner-format` 回退。新增覆盖来自 Xray live audit runner，finding 预算未增长；旧版“184 文件迁移”是当时的分支差异规模，不再作为当前任务数量或结构验收口径。
 
 ## 可选外部扩展验证
 

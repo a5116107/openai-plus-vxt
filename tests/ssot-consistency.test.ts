@@ -101,7 +101,7 @@ test('QR-15 current external-gate evidence is dated and fail-closed', () => {
 
 test('QR-16 and QR-17 structural baseline contract is consistent and executable', () => {
   for (const document of [rootIndex, qualityRemediationReadme, qualityRemediationTasks, qualityRemediationVerify]) {
-    assert.match(document, /169 (?:个)?文件/);
+    assert.match(document, /170 (?:个)?文件/);
     assert.match(document, /91 (?:个 )?finding/);
     assert.match(document, /0 blocker/);
   }
@@ -120,5 +120,5 @@ test('QR-19/QR-20 live stage, plan and stability contracts are explicit', () => 
   assert.match(rootIndex, /history\.jsonl.*最近 3 次窗口内至少连续 2 次/s);
   assert.match(rootIndex, /audit:live:strict/);
   assert.match(rootIndex, /audit:live:xray/);
-  assert.match(qualityRemediationVerify, /Live readiness 单元.*13\/13/);
+  assert.match(qualityRemediationVerify, /Live readiness 单元.*15\/15/);
 });
